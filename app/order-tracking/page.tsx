@@ -320,7 +320,7 @@ export default function OrderTrackingPage() {
         <div className="mt-8 bg-blue-50 border border-blue-200 rounded-lg p-6">
           <h3 className="font-semibold text-blue-900 mb-2">Need Help?</h3>
           <p className="text-sm text-blue-800 mb-4">
-            If you're having trouble finding your order, please contact us directly.
+            If you&apos;re having trouble finding your order, please contact us directly.
           </p>
           <div className="flex flex-col sm:flex-row gap-3">
             <a

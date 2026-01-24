@@ -208,7 +208,7 @@ export default function AdminDashboard() {
       setFetchError(errorMessage)
       setLoading(false)
     }
-  }, [])
+  }, [playContinuousSound])
 
   const handleLogin = () => {
     if (password === ADMIN_PASSWORD) {

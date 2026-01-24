@@ -15,14 +15,12 @@ function OrderConfirmationContent() {
 
   useEffect(() => {
     if (sessionId) {
-      // Clear cart on successful order
-      clearCart()
-      
       // Verify the order was created
       verifyOrder()
     } else {
       setOrderStatus('error')
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessionId])
 
   const verifyOrder = async (attempt = 1) => {
@@ -35,6 +33,9 @@ function OrderConfirmationContent() {
         if (order) {
           setOrderDetails(order)
           setOrderStatus('success')
+          clearCart()
+          localStorage.removeItem('madinah-market-customer-info')
+          localStorage.removeItem('madinah-market-order-details')
           return
         }
       }
@@ -97,6 +98,9 @@ function OrderConfirmationContent() {
                     console.log('Order found and set:', fullOrder.id)
                     setOrderDetails(fullOrder)
                     setOrderStatus('success')
+                    clearCart()
+                    localStorage.removeItem('madinah-market-customer-info')
+                    localStorage.removeItem('madinah-market-order-details')
                     return
                   }
                 }
@@ -160,7 +164,7 @@ function OrderConfirmationContent() {
               There was an issue processing your order.
             </p>
             <p className="text-sm text-gray-500 mb-8">
-              If you were charged, please contact us with your order details and we'll resolve this immediately.
+              If you were charged, please contact us with your order details and we&apos;ll resolve this immediately.
             </p>
           </div>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
@@ -211,7 +215,7 @@ function OrderConfirmationContent() {
           <div className="bg-gray-50 rounded-lg p-6 mb-8 text-left">
             <h2 className="font-semibold text-xl text-gray-900 mb-4 flex items-center gap-2">
               <Clock size={20} />
-              What's Next?
+              What&apos;s Next?
             </h2>
             <ul className="space-y-3 text-gray-700">
               <li className="flex items-start gap-3">
@@ -224,7 +228,7 @@ function OrderConfirmationContent() {
               </li>
               <li className="flex items-start gap-3">
                 <span className="text-green-600 font-bold">✓</span>
-                <span>We'll notify you when your order is ready for pickup</span>
+                <span>We&apos;ll notify you when your order is ready for pickup</span>
               </li>
               <li className="flex items-start gap-3">
                 <span className="text-green-600 font-bold">✓</span>
@@ -323,7 +327,7 @@ function OrderConfirmationContent() {
               <a href="tel:+17207630786" className="font-semibold underline">
                 (720) 763-0786
               </a>{' '}
-              and we'll be happy to help!
+              and we&apos;ll be happy to help!
             </p>
           </div>
 
