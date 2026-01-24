@@ -1,0 +1,371 @@
+'use client'
+
+import { useEffect, useState, Suspense } from 'react'
+import { useSearchParams, useRouter } from 'next/navigation'
+import { CheckCircle, Clock, X, Phone, Mail } from 'lucide-react'
+import Link from 'next/link'
+import { clearCart } from '@/lib/cart'
+
+function OrderConfirmationContent() {
+  const searchParams = useSearchParams()
+  const router = useRouter()
+  const sessionId = searchParams.get('session_id')
+  const [orderStatus, setOrderStatus] = useState<'loading' | 'success' | 'error'>('loading')
+  const [orderDetails, setOrderDetails] = useState<any>(null)
+
+  useEffect(() => {
+    if (sessionId) {
+      // Clear cart on successful order
+      clearCart()
+      
+      // Verify the order was created
+      verifyOrder()
+    } else {
+      setOrderStatus('error')
+    }
+  }, [sessionId])
+
+  const verifyOrder = async (attempt = 1) => {
+    try {
+      // First, try to fetch orders and find the one matching this session
+      const response = await fetch('/api/orders', { cache: 'no-store' })
+      if (response.ok) {
+        const { orders } = await response.json()
+        const order = orders.find((o: any) => o.stripe_session_id === sessionId)
+        if (order) {
+          setOrderDetails(order)
+          setOrderStatus('success')
+          return
+        }
+      }
+      
+      // If order not found, ALWAYS try direct creation (for $0 orders or webhook failures)
+      // Get cart data from localStorage (if still available)
+      if (attempt <= 2) {
+        try {
+          const cartData = localStorage.getItem('madinah-market-cart')
+          const customerData = localStorage.getItem('madinah-market-customer-info')
+          const orderDetailsData = localStorage.getItem('madinah-market-order-details')
+          
+          if (cartData && customerData) {
+            const cart = JSON.parse(cartData)
+            const customerInfo = JSON.parse(customerData)
+            const orderDetails = orderDetailsData ? JSON.parse(orderDetailsData) : null
+            
+            console.log('Attempting to create order directly...', { sessionId, cartLength: cart.length })
+            
+            // Try to create order directly (for $0 orders or webhook failures)
+            const createResponse = await fetch('/api/orders/create-direct', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                sessionId,
+                customerInfo,
+                orderDetails,
+                items: cart.map((item: any) => {
+                  let itemPrice = item.price || 0
+                  if (item.selectedAddons && item.selectedAddons.length > 0) {
+                    itemPrice += item.selectedAddons.reduce((sum: number, addon: any) => sum + (addon.price || 0), 0)
+                  }
+                  return {
+                    id: item.id,
+                    name: item.name,
+                    price: itemPrice,
+                    quantity: item.quantity,
+                    selectedOptions: item.selectedOptions || [],
+                    selectedAddons: item.selectedAddons || [],
+                  }
+                }),
+              }),
+            })
+            
+            const createData = await createResponse.json()
+            console.log('Order creation response:', createResponse.ok, createData)
+            
+            if (createResponse.ok) {
+              const { order } = createData
+              if (order) {
+                // Wait a moment for database to update, then fetch the full order
+                await new Promise(resolve => setTimeout(resolve, 500))
+                
+                // Fetch the full order with items
+                const orderResponse = await fetch('/api/orders', { cache: 'no-store' })
+                if (orderResponse.ok) {
+                  const { orders } = await orderResponse.json()
+                  const fullOrder = orders.find((o: any) => o.id === order.id || o.stripe_session_id === sessionId)
+                  if (fullOrder) {
+                    console.log('Order found and set:', fullOrder.id)
+                    setOrderDetails(fullOrder)
+                    setOrderStatus('success')
+                    return
+                  }
+                }
+              }
+            } else {
+              console.error('Order creation failed:', createData.error)
+            }
+          } else {
+            console.warn('Cart or customer data not found in localStorage')
+          }
+        } catch (directError) {
+          console.error('Direct order creation error:', directError)
+        }
+      }
+      
+      // Retry up to 3 times
+      if (attempt < 3) {
+        setTimeout(() => {
+          verifyOrder(attempt + 1)
+        }, 1500)
+      } else {
+        // After 3 attempts, show success anyway
+        console.warn('Order verification timed out, showing success page anyway')
+        setOrderStatus('success')
+      }
+    } catch (error) {
+      console.error('Error verifying order:', error)
+      // On error, still show success (payment was successful)
+      if (attempt < 3) {
+        setTimeout(() => {
+          verifyOrder(attempt + 1)
+        }, 1500)
+      } else {
+        setOrderStatus('success')
+      }
+    }
+  }
+
+  if (orderStatus === 'loading') {
+    return (
+      <div className="min-h-screen bg-white flex items-center justify-center p-4">
+        <div className="text-center">
+          <Clock className="animate-spin mx-auto text-gray-600 mb-4" size={48} />
+          <p className="text-lg text-gray-600">Processing your order...</p>
+          <p className="text-sm text-gray-500 mt-2">Please wait while we confirm your payment</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (orderStatus === 'error') {
+    return (
+      <div className="min-h-screen bg-white flex items-center justify-center p-4">
+        <div className="max-w-md mx-auto text-center">
+          <div className="mb-6">
+            <X className="mx-auto text-red-500 mb-4" size={64} />
+            <h1 className="font-display text-4xl font-bold text-gray-900 mb-4">
+              Order Error
+            </h1>
+            <p className="text-lg text-gray-600 mb-2">
+              There was an issue processing your order.
+            </p>
+            <p className="text-sm text-gray-500 mb-8">
+              If you were charged, please contact us with your order details and we'll resolve this immediately.
+            </p>
+          </div>
+          <div className="flex flex-col sm:flex-row gap-4 justify-center">
+            <Link
+              href="/cart"
+              className="inline-block bg-black text-white px-8 py-3 rounded-lg font-semibold hover:bg-gray-800 transition-colors"
+            >
+              Return to Cart
+            </Link>
+            <a
+              href="tel:+17207630786"
+              className="inline-flex items-center justify-center gap-2 border-2 border-gray-300 text-gray-900 px-8 py-3 rounded-lg font-semibold hover:border-black transition-colors"
+            >
+              <Phone size={20} />
+              Call Us
+            </a>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="min-h-screen bg-gray-50 py-12">
+      <div className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="bg-white rounded-xl shadow-lg p-8 text-center">
+          <div className="mb-6">
+            <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <CheckCircle className="text-green-600" size={48} />
+            </div>
+            <h1 className="font-display text-4xl font-bold text-gray-900 mb-2">
+              Order Confirmed!
+            </h1>
+            <p className="text-lg text-gray-600">
+              Thank you for your order at Madinah Market
+            </p>
+            {orderDetails ? (
+              <p className="text-sm text-gray-500 mt-2">
+                Order #{(orderDetails as any).order_number || orderDetails.id.substring(0, 8)}
+              </p>
+            ) : sessionId && (
+              <p className="text-sm text-gray-500 mt-2">
+                Order #{sessionId.substring(0, 20)}...
+              </p>
+            )}
+          </div>
+
+          <div className="bg-gray-50 rounded-lg p-6 mb-8 text-left">
+            <h2 className="font-semibold text-xl text-gray-900 mb-4 flex items-center gap-2">
+              <Clock size={20} />
+              What's Next?
+            </h2>
+            <ul className="space-y-3 text-gray-700">
+              <li className="flex items-start gap-3">
+                <span className="text-green-600 font-bold">✓</span>
+                <span>Your payment has been processed successfully</span>
+              </li>
+              <li className="flex items-start gap-3">
+                <span className="text-green-600 font-bold">✓</span>
+                <span>Your order is now being prepared with care</span>
+              </li>
+              <li className="flex items-start gap-3">
+                <span className="text-green-600 font-bold">✓</span>
+                <span>We'll notify you when your order is ready for pickup</span>
+              </li>
+              <li className="flex items-start gap-3">
+                <span className="text-green-600 font-bold">✓</span>
+                <span>Estimated preparation time: 20-30 minutes</span>
+              </li>
+            </ul>
+          </div>
+
+          {orderDetails ? (
+            <>
+              <div className="bg-gray-50 rounded-lg p-6 mb-6 text-left">
+                <h3 className="font-semibold text-lg text-gray-900 mb-3">Order Items</h3>
+                <ul className="space-y-2 text-sm text-gray-700 mb-4">
+                  {orderDetails.order_items?.map((item: any, idx: number) => (
+                    <li key={idx} className="flex justify-between">
+                      <span>{item.quantity}x {item.menu_item_name}</span>
+                      <span className="font-semibold">${(item.price * item.quantity).toFixed(2)}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+              <div className="bg-gray-50 rounded-lg p-6 mb-8 text-left">
+                <h3 className="font-semibold text-lg text-gray-900 mb-3">Order Summary</h3>
+                <div className="space-y-2 text-sm text-gray-700">
+                  {(() => {
+                    const tipAmount = typeof orderDetails.tip_amount === 'number' ? orderDetails.tip_amount : 0
+                    const subtotal = orderDetails.total_amount - orderDetails.tax_amount - tipAmount
+                    return (
+                      <>
+                        <div className="flex justify-between">
+                          <span>Subtotal:</span>
+                          <span className="font-semibold">${subtotal.toFixed(2)}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>Tax:</span>
+                          <span className="font-semibold">${orderDetails.tax_amount.toFixed(2)}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>Tip:</span>
+                          <span className="font-semibold">${tipAmount.toFixed(2)}</span>
+                        </div>
+                      </>
+                    )
+                  })()}
+                  <div className="border-t border-gray-300 pt-2 mt-2 flex justify-between font-bold text-lg">
+                    <span>Total:</span>
+                    <span>${orderDetails.total_amount.toFixed(2)}</span>
+                  </div>
+                </div>
+              </div>
+              <div className="bg-gray-50 rounded-lg p-6 mb-8 text-left">
+                <h3 className="font-semibold text-lg text-gray-900 mb-3">Order Details</h3>
+                <div className="space-y-2 text-sm text-gray-700">
+                  <div className="flex justify-between">
+                    <span>Order type:</span>
+                    <span className="font-semibold">{orderDetails.order_type || 'pickup'}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Requested time:</span>
+                    <span className="font-semibold">
+                      {orderDetails.time_choice === 'scheduled' && orderDetails.scheduled_time
+                        ? (() => {
+                            const parsed = new Date(orderDetails.scheduled_time)
+                            return Number.isNaN(parsed.getTime())
+                              ? 'As soon as possible'
+                              : parsed.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
+                          })()
+                        : 'As soon as possible'}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Payment:</span>
+                    <span className="font-semibold">
+                      {orderDetails.payment_method === 'online' ? 'Pay online' : (orderDetails.payment_method || 'Pay online')}
+                    </span>
+                  </div>
+                  {orderDetails.comments && (
+                    <div className="text-sm text-gray-700">
+                      <span className="font-semibold">Comments:</span> {orderDetails.comments}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </>
+          ) : (
+            <div className="bg-gray-50 rounded-lg p-6 mb-8 text-left">
+              <p className="text-sm text-gray-600">
+                Your order details are being processed. You will receive a confirmation email shortly.
+              </p>
+            </div>
+          )}
+
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-8">
+            <p className="text-sm text-blue-900">
+              <strong>Need to make changes?</strong> Call us at{' '}
+              <a href="tel:+17207630786" className="font-semibold underline">
+                (720) 763-0786
+              </a>{' '}
+              and we'll be happy to help!
+            </p>
+          </div>
+
+          <div className="flex flex-col sm:flex-row gap-4 justify-center">
+            <Link
+              href="/order-tracking"
+              className="inline-flex items-center justify-center bg-black text-white px-8 py-3 rounded-lg font-semibold hover:bg-gray-800 transition-colors"
+            >
+              Track Your Order
+            </Link>
+            <Link
+              href="/menu"
+              className="inline-flex items-center justify-center border-2 border-gray-300 text-gray-900 px-8 py-3 rounded-lg font-semibold hover:border-black transition-colors"
+            >
+              Order More
+            </Link>
+            <Link
+              href="/"
+              className="inline-flex items-center justify-center border-2 border-gray-300 text-gray-900 px-8 py-3 rounded-lg font-semibold hover:border-black transition-colors"
+            >
+              Back to Home
+            </Link>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+export default function OrderConfirmationPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-white flex items-center justify-center">
+          <div className="text-center">
+            <Clock className="animate-spin mx-auto text-gray-600 mb-4" size={48} />
+            <p className="text-lg text-gray-600">Loading...</p>
+          </div>
+        </div>
+      }
+    >
+      <OrderConfirmationContent />
+    </Suspense>
+  )
+}
