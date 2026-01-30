@@ -271,13 +271,19 @@ export default function MenuItemModal({
                   <label
                     key={addon.id}
                     className="flex items-center justify-between p-2 sm:p-2.5 border border-gray-200 rounded-lg hover:border-black transition-colors cursor-pointer"
+                    onClick={(e) => {
+                      e.preventDefault()
+                      toggleAddon(addon.id)
+                    }}
                   >
                     <div className="flex items-center gap-2.5">
                       <input
                         type="checkbox"
                         checked={selectedAddons.has(addon.id)}
-                        onChange={() => toggleAddon(addon.id)}
-                        className="w-4 h-4 border-gray-300 rounded text-black focus:ring-black"
+                        onChange={() => {}}
+                        onClick={(e) => e.stopPropagation()}
+                        className="w-4 h-4 border-gray-300 rounded text-black focus:ring-black cursor-pointer"
+                        readOnly
                       />
                       <span className="text-xs sm:text-sm font-medium text-gray-900">{addon.label}</span>
                     </div>
@@ -294,12 +300,18 @@ export default function MenuItemModal({
                   <label
                     key={option.id}
                     className="flex items-center p-2 sm:p-2.5 border border-gray-200 rounded-lg hover:border-black transition-colors cursor-pointer"
+                    onClick={(e) => {
+                      e.preventDefault()
+                      toggleFreeOption(option.id)
+                    }}
                   >
                     <input
                       type="checkbox"
                       checked={selectedFreeOptions.has(option.id)}
-                      onChange={() => toggleFreeOption(option.id)}
-                      className="w-4 h-4 border-gray-300 rounded text-black focus:ring-black"
+                      onChange={() => {}}
+                      onClick={(e) => e.stopPropagation()}
+                      className="w-4 h-4 border-gray-300 rounded text-black focus:ring-black cursor-pointer"
+                      readOnly
                     />
                     <span className="ml-2.5 text-xs sm:text-sm font-medium text-gray-900">{option.label}</span>
                   </label>
@@ -315,14 +327,20 @@ export default function MenuItemModal({
                   <label
                     key={drink.id}
                     className="flex items-center justify-between p-2 sm:p-2.5 border border-gray-200 rounded-lg hover:border-black transition-colors cursor-pointer"
+                    onClick={(e) => {
+                      e.preventDefault()
+                      setSelectedDrink(drink.id)
+                    }}
                   >
                     <div className="flex items-center gap-2.5">
                       <input
                         type="radio"
                         name="drink"
                         checked={selectedDrink === drink.id}
-                        onChange={() => setSelectedDrink(drink.id)}
-                        className="w-4 h-4 border-gray-300 text-black focus:ring-black"
+                        onChange={() => {}}
+                        onClick={(e) => e.stopPropagation()}
+                        className="w-4 h-4 border-gray-300 text-black focus:ring-black cursor-pointer"
+                        readOnly
                       />
                       <span className="text-xs sm:text-sm font-medium text-gray-900">{drink.label}</span>
                     </div>
