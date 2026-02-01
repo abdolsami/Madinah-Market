@@ -60,7 +60,7 @@ Build a React Native Android application that replicates the exact admin dashboa
 - NO delays, NO lag - this is a restaurant kitchen app that needs instant notifications
 
 **Restaurant Context**
-- Restaurant Name: **Madinah Market** (display prominently throughout app)
+- Restaurant Name: **Denver Kabob** (display prominently throughout app)
 - Tagline: "Authentic Afghan Cuisine"
 - Display restaurant branding in:
   - Login screen header
@@ -145,7 +145,7 @@ Colors: {
 **Design:**
 - White background (#ffffff)
 - Centered login card with border and shadow
-- **Restaurant Branding**: Display "Madinah Market" logo/name at top (font-display, 2xl, bold)
+- **Restaurant Branding**: Display "Denver Kabob" logo/name at top (font-display, 2xl, bold)
 - Subtitle: "Admin Dashboard" (gray-600)
 - Black heading "Admin Login" (font-display, 3xl, bold)
 - Password input field (black border, rounded-lg)
@@ -154,14 +154,14 @@ Colors: {
 
 **Functionality:**
 - Password: "admin123" (configurable via environment variable)
-- Store authentication in AsyncStorage (key: 'madinah-market-admin-authenticated')
+- Store authentication in AsyncStorage (key: 'denver-kabob-admin-authenticated')
 - Auto-login if session exists (check on app start)
 - Show error message for incorrect password
 
 ### 2. Main Dashboard Screen
 
 #### Header Section
-- **Restaurant Name**: "Madinah Market" (font-display, 2xl, bold, gray-900) - Display prominently
+- **Restaurant Name**: "Denver Kabob" (font-display, 2xl, bold, gray-900) - Display prominently
 - **Title**: "Admin Dashboard" (font-display, 4xl, bold, gray-900)
 - **Subtitle**: "Last updated: [time] • [X] total orders" (small, gray-500)
 - **Buttons** (right side):
@@ -249,7 +249,7 @@ Each order card:
   
 - **Text**:
   - "NEW ORDER!" (6xl, bold, white, pulsing animation)
-  - "Madinah Market" (3xl, semibold, white/80) - Restaurant name
+  - "Denver Kabob" (3xl, semibold, white/80) - Restaurant name
   - "Order #[number]" (4xl, semibold, green-300)
   - "Click anywhere to view" (2xl, white/90)
   - Small indicator: "Sound will continue until you click"
@@ -441,7 +441,7 @@ const subscription = supabase
 
 If you prefer to use the API routes:
 - **Base URL**: Configurable via `API_BASE_URL` environment variable
-- Example: `https://your-domain.com` or `http://localhost:3000` for development
+- Example: `https://your-domain.com`
 - All API calls: `${API_BASE_URL}/api/orders`
 - **Note**: This requires polling every 2-3 seconds (slower than Supabase Realtime)
 
@@ -593,10 +593,10 @@ const statusConfig: Record<OrderStatus, StatusConfig> = {
 ### Restaurant Configuration
 ```typescript
 const RESTAURANT_CONFIG = {
-  name: 'Madinah Market',
+  name: 'Denver Kabob',
   tagline: 'Authentic Afghan Cuisine',
-  phone: '+17207630786',
-  address: '3126 S Parker Rd, Aurora, CO 80014',
+  phone: '+17205733605',
+  address: '19245 E 56th Ave, Denver, CO 80249',
 }
 ```
 
@@ -615,7 +615,7 @@ const handleLogin = () => {
 }
 
 const checkSession = async () => {
-  const session = await AsyncStorage.getItem('madinah-market-admin-authenticated')
+  const session = await AsyncStorage.getItem('denver-kabob-admin-authenticated')
   if (session === 'true') {
     setAuthenticated(true)
     fetchOrders()
@@ -668,7 +668,7 @@ useEffect(() => {
           if (Platform.OS === 'android') {
             Notifications.scheduleNotificationAsync({
               content: {
-                title: 'New Order - Madinah Market',
+                title: 'New Order - Denver Kabob',
                 body: `Order #${fullOrder.order_number}`,
                 sound: true,
                 priority: 'high',
@@ -883,7 +883,7 @@ ADMIN_PASSWORD=admin123
 15. ✅ Stats cards show correct counts
 16. ✅ Order numbers display correctly (numeric)
 17. ✅ **Real-time polling every 2-3 seconds (NOT 5 seconds)**
-18. ✅ Restaurant name "Madinah Market" displayed throughout app
+18. ✅ Restaurant name "Denver Kabob" displayed throughout app
 19. ✅ No duplicate API requests (request deduplication works)
 20. ✅ App remains responsive during polling
 
@@ -911,7 +911,7 @@ ADMIN_PASSWORD=admin123
 - **Order Numbers**: Must display numeric order numbers (1000, 1001, etc.), not UUIDs
 - **Tablet Optimized**: Layout should work well on Android tablets (iPad-sized screens)
 - **REAL-TIME PERFORMANCE**: Orders must appear within 2-3 seconds maximum - this is CRITICAL
-- **Restaurant Branding**: "Madinah Market" must be displayed prominently throughout the app
+- **Restaurant Branding**: "Denver Kabob" must be displayed prominently throughout the app
 - **TypeScript**: All code must be fully typed with the interfaces provided above
 - **No Delays**: The app should feel instant - use aggressive polling (2-3 seconds) or WebSocket
 - **Request Optimization**: Implement request deduplication to prevent multiple simultaneous API calls

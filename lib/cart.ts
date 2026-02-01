@@ -1,6 +1,6 @@
 import { CartItem } from './types'
 
-const CART_STORAGE_KEY = 'madinah-market-cart'
+const CART_STORAGE_KEY = 'denver-kabob-cart'
 
 export const getCart = (): CartItem[] => {
   if (typeof window === 'undefined') return []

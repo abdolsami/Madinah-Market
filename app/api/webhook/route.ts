@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from 'next/server'
 import Stripe from 'stripe'
 import { createServerClient } from '@/lib/supabase'
 
+export const runtime = 'nodejs'
+export const dynamic = 'force-dynamic'
+
 const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY
 const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET
 
@@ -11,7 +14,7 @@ if (!STRIPE_SECRET_KEY || !webhookSecret) {
 
 const stripe = STRIPE_SECRET_KEY
   ? new Stripe(STRIPE_SECRET_KEY, {
-      apiVersion: '2024-11-20.acacia',
+      apiVersion: '2023-10-16',
     })
   : null
 
@@ -47,6 +50,12 @@ export async function POST(request: NextRequest) {
     const session = event.data.object as Stripe.Checkout.Session
 
     try {
+      // Ensure payment is actually successful
+      if (session.payment_status && session.payment_status !== 'paid' && session.payment_status !== 'no_payment_required') {
+        console.warn('Ignoring checkout.session.completed with non-paid status:', session.id, session.payment_status)
+        return NextResponse.json({ received: true })
+      }
+
       const supabase = createServerClient()
 
       // Extract order data from session metadata
@@ -56,10 +65,6 @@ export async function POST(request: NextRequest) {
         customer_last_name,
         customer_phone,
         customer_email,
-        order_type,
-        time_choice,
-        scheduled_time,
-        payment_method,
         tip_percent,
         tip_amount,
         comments,
@@ -145,15 +150,32 @@ export async function POST(request: NextRequest) {
       }
 
       // Create order in Supabase
-      const parsedScheduledTime = scheduled_time && !Number.isNaN(Date.parse(scheduled_time))
-        ? new Date(scheduled_time).toISOString()
-        : null
-      const parsedTipPercent = tip_percent !== undefined && tip_percent !== null && tip_percent !== ''
-        ? parseFloat(tip_percent)
-        : null
-      const parsedTipAmount = tip_amount !== undefined && tip_amount !== null && tip_amount !== ''
-        ? parseFloat(tip_amount)
-        : null
+      const parsedTaxRaw = tax ? parseFloat(tax) : 0
+      const taxAmount = Number.isFinite(parsedTaxRaw) ? parsedTaxRaw : 0
+
+      const parsedSubtotalRaw = subtotal ? parseFloat(subtotal) : 0
+      const subtotalAmount = Number.isFinite(parsedSubtotalRaw) ? parsedSubtotalRaw : 0
+
+      const parsedTipAmountRaw =
+        tip_amount !== undefined && tip_amount !== null && tip_amount !== ''
+          ? parseFloat(tip_amount)
+          : 0
+      const tipAmount = Number.isFinite(parsedTipAmountRaw) && parsedTipAmountRaw >= 0
+        ? parsedTipAmountRaw
+        : 0
+
+      const parsedTipPercentRaw =
+        tip_percent !== undefined && tip_percent !== null && tip_percent !== ''
+          ? parseFloat(tip_percent)
+          : 0
+      const tipPercent = Number.isFinite(parsedTipPercentRaw) && parsedTipPercentRaw >= 0
+        ? parsedTipPercentRaw
+        : 0
+
+      const normalizedTipAmount =
+        tipAmount > 0 ? tipAmount : Number((subtotalAmount * (tipPercent / 100)).toFixed(2))
+
+      const totalAmount = Number((subtotalAmount + taxAmount + normalizedTipAmount).toFixed(2))
 
       const fullInsertPayload = {
         customer_name,
@@ -161,15 +183,11 @@ export async function POST(request: NextRequest) {
         customer_last_name: derivedLastName,
         customer_phone,
         customer_email: customer_email || null,
-        order_type: order_type || null,
-        time_choice: time_choice || null,
-        scheduled_time: parsedScheduledTime,
-        payment_method: payment_method || null,
-        tip_percent: parsedTipPercent,
-        tip_amount: parsedTipAmount,
-        comments: comments || null,
-        total_amount: parseFloat(total || '0'),
-        tax_amount: parseFloat(tax || '0'),
+        tip_percent: Number.isFinite(tipPercent) ? tipPercent : null,
+        tip_amount: Number.isFinite(normalizedTipAmount) ? normalizedTipAmount : null,
+        comments: comments ? comments.toString().slice(0, 400) : null,
+        total_amount: totalAmount,
+        tax_amount: taxAmount,
         status: 'pending',
         stripe_session_id: session.id,
       }
@@ -182,8 +200,8 @@ export async function POST(request: NextRequest) {
         customer_name,
         customer_phone,
         customer_email: customer_email || null,
-        total_amount: parseFloat(total || '0'),
-        tax_amount: parseFloat(tax || '0'),
+        total_amount: totalAmount,
+        tax_amount: taxAmount,
         status: 'pending',
         stripe_session_id: session.id,
       }

@@ -1,4 +1,4 @@
-# Code Fixes Applied - Madinah Market
+# Code Fixes Applied - Denver Kabob
 
 ## Summary
 Fixed all logic errors, code quality issues, and architectural problems identified in the code review (except admin password security per user request).

@@ -1,6 +1,6 @@
 # Complete Supabase Setup Guide
 
-This guide will walk you through setting up Supabase for your Madinah Market restaurant website.
+This guide will walk you through setting up Supabase for your Denver Kabob restaurant website.
 
 ## Prerequisites
 
@@ -21,7 +21,7 @@ This guide will walk you through setting up Supabase for your Madinah Market res
 
 1. Once logged in, click **"New Project"** button (top right)
 2. Fill in the project details:
-   - **Name**: `Madinah Market` (or any name you prefer)
+   - **Name**: `Denver Kabob` (or any name you prefer)
    - **Database Password**: 
      - ⚠️ **IMPORTANT**: Choose a strong password and **SAVE IT** somewhere safe
      - You'll need this if you ever want to connect directly to the database
@@ -132,7 +132,7 @@ If your Next.js server is running:
 
 ### 5.2 Test the Connection
 
-1. Open your browser to `http://localhost:3000`
+1. Open your deployed site URL (e.g. `https://your-domain.com`)
 2. Navigate to `/menu` - menu items should load
 3. Try adding items to cart
 4. Complete a test order (with Stripe test card)

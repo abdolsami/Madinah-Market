@@ -1,4 +1,4 @@
-# Madinah Market - Afghan Restaurant Website
+# Denver Kabob - Afghan Restaurant Website
 
 A fully functional, production-ready restaurant website built with Next.js, Tailwind CSS, Supabase, and Stripe.
 
@@ -35,7 +35,7 @@ A fully functional, production-ready restaurant website built with Next.js, Tail
 1. **Clone the repository**
    ```bash
    git clone <your-repo-url>
-   cd madinah-market
+   cd denver-kabob
    ```
 
 2. **Install dependencies**
@@ -94,12 +94,12 @@ A fully functional, production-ready restaurant website built with Next.js, Tail
    yarn dev
    ```
 
-   Open [http://localhost:3000](http://localhost:3000) in your browser.
+   Open your deployed site URL (or your local dev URL) in your browser.
 
 ## Project Structure
 
 ```
-madinah-market/
+denver-kabob/
 ├── app/                    # Next.js App Router pages
 │   ├── api/               # API routes
 │   │   ├── create-checkout-session/

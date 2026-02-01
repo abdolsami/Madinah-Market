@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerClient } from '@/lib/supabase'
 
+export const runtime = 'nodejs'
+export const dynamic = 'force-dynamic'
+
 // Direct order creation endpoint for testing (bypasses Stripe webhook)
 export async function POST(request: NextRequest) {
   try {
@@ -60,24 +63,21 @@ export async function POST(request: NextRequest) {
     }, 0)
     
     const TAX_RATE = 0.08
-    const tax = subtotal * TAX_RATE
-    const normalizedTipPercent = Number(orderDetails?.tipPercent || 0)
-    const calculatedTipAmount = Number(
-      (typeof orderDetails?.tipAmount === 'number'
-        ? orderDetails.tipAmount
-        : (subtotal * normalizedTipPercent) / 100
-      ).toFixed(2)
-    )
-    const total = subtotal + tax + calculatedTipAmount
-    const tipPercentValue = Number.isFinite(normalizedTipPercent) ? normalizedTipPercent : 0
-    const tipAmountValue = Number.isFinite(calculatedTipAmount) ? calculatedTipAmount : 0
+    const tax = Number((subtotal * TAX_RATE).toFixed(2))
 
-    const parsedScheduledTime = orderDetails?.scheduledTime && !Number.isNaN(Date.parse(orderDetails.scheduledTime))
-      ? new Date(orderDetails.scheduledTime).toISOString()
-      : null
-    if (orderDetails?.timeChoice === 'scheduled' && !parsedScheduledTime) {
+    const rawTipPercent = Number(orderDetails?.tipPercent ?? 0)
+    const normalizedTipPercent = Number.isFinite(rawTipPercent)
+      ? Math.min(Math.max(rawTipPercent, 0), 100)
+      : 0
+    const tipAmount = Number((subtotal * (normalizedTipPercent / 100)).toFixed(2))
+
+    const normalizedComments = (orderDetails?.comments || '').toString().trim().slice(0, 400)
+
+    const total = Number((subtotal + tax + tipAmount).toFixed(2))
+
+    if (!Number.isFinite(total) || total <= 0) {
       return NextResponse.json(
-        { error: 'Scheduled time is required for scheduled orders' },
+        { error: 'Invalid order total. Please review your cart and try again.' },
         { status: 400 }
       )
     }
@@ -170,13 +170,9 @@ export async function POST(request: NextRequest) {
       customer_last_name: customerLastName || null,
       customer_phone: customerPhone,
       customer_email: customerEmail || null,
-      order_type: orderDetails?.orderType || null,
-      time_choice: orderDetails?.timeChoice || null,
-      scheduled_time: parsedScheduledTime,
-      payment_method: orderDetails?.paymentMethod || null,
-      tip_percent: tipPercentValue,
-      tip_amount: tipAmountValue,
-      comments: orderDetails?.comments || null,
+      tip_percent: normalizedTipPercent,
+      tip_amount: tipAmount,
+      comments: normalizedComments || null,
       total_amount: total,
       tax_amount: tax,
       status: 'pending',

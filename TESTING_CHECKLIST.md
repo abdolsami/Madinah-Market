@@ -153,7 +153,7 @@
 1. Go to `/menu`
 2. Click on any menu item
 3. Select options (e.g., "NO SALAD", "ADD HOT SAUCE")
-4. Select addons (e.g., "XTRA RICE", "add can soda")
+4. Select addons (e.g., "XTRA RICE")
 5. Set quantity to 2
 6. Click "Add to Cart"
 7. **Verify**: Cart icon shows count of 2

@@ -34,8 +34,8 @@ function OrderConfirmationContent() {
           setOrderDetails(order)
           setOrderStatus('success')
           clearCart()
-          localStorage.removeItem('madinah-market-customer-info')
-          localStorage.removeItem('madinah-market-order-details')
+          localStorage.removeItem('denver-kabob-customer-info')
+          localStorage.removeItem('denver-kabob-order-details')
           return
         }
       }
@@ -44,9 +44,9 @@ function OrderConfirmationContent() {
       // Get cart data from localStorage (if still available)
       if (attempt <= 2) {
         try {
-          const cartData = localStorage.getItem('madinah-market-cart')
-          const customerData = localStorage.getItem('madinah-market-customer-info')
-          const orderDetailsData = localStorage.getItem('madinah-market-order-details')
+          const cartData = localStorage.getItem('denver-kabob-cart')
+          const customerData = localStorage.getItem('denver-kabob-customer-info')
+          const orderDetailsData = localStorage.getItem('denver-kabob-order-details')
           
           if (cartData && customerData) {
             const cart = JSON.parse(cartData)
@@ -99,8 +99,8 @@ function OrderConfirmationContent() {
                     setOrderDetails(fullOrder)
                     setOrderStatus('success')
                     clearCart()
-                    localStorage.removeItem('madinah-market-customer-info')
-                    localStorage.removeItem('madinah-market-order-details')
+                    localStorage.removeItem('denver-kabob-customer-info')
+                    localStorage.removeItem('denver-kabob-order-details')
                     return
                   }
                 }
@@ -175,7 +175,7 @@ function OrderConfirmationContent() {
               Return to Cart
             </Link>
             <a
-              href="tel:+17207630786"
+              href="tel:+17205733605"
               className="inline-flex items-center justify-center gap-2 border-2 border-gray-300 text-gray-900 px-8 py-3 rounded-lg font-semibold hover:border-black transition-colors"
             >
               <Phone size={20} />
@@ -196,20 +196,21 @@ function OrderConfirmationContent() {
               <CheckCircle className="text-green-600" size={48} />
             </div>
             <h1 className="font-display text-4xl font-bold text-gray-900 mb-2">
-              Order Confirmed!
+              {(() => {
+                const first = orderDetails?.customer_first_name?.trim()
+                const last = orderDetails?.customer_last_name?.trim()
+                const name = first || last ? `${first || ''} ${last || ''}`.trim() : null
+                return name ? `Order confirmed, ${name}!` : 'Order Confirmed!'
+              })()}
             </h1>
             <p className="text-lg text-gray-600">
-              Thank you for your order at Madinah Market
+              Thank you for your order at Denver Kabob.
             </p>
             {orderDetails ? (
               <p className="text-sm text-gray-500 mt-2">
-                Order #{(orderDetails as any).order_number || orderDetails.id.substring(0, 8)}
+                Order #{(orderDetails as any).order_number ?? orderDetails.id.substring(0, 8)}
               </p>
-            ) : sessionId && (
-              <p className="text-sm text-gray-500 mt-2">
-                Order #{sessionId.substring(0, 20)}...
-              </p>
-            )}
+            ) : null}
           </div>
 
           <div className="bg-gray-50 rounded-lg p-6 mb-8 text-left">
@@ -279,39 +280,12 @@ function OrderConfirmationContent() {
                   </div>
                 </div>
               </div>
-              <div className="bg-gray-50 rounded-lg p-6 mb-8 text-left">
-                <h3 className="font-semibold text-lg text-gray-900 mb-3">Order Details</h3>
-                <div className="space-y-2 text-sm text-gray-700">
-                  <div className="flex justify-between">
-                    <span>Order type:</span>
-                    <span className="font-semibold">{orderDetails.order_type || 'pickup'}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>Requested time:</span>
-                    <span className="font-semibold">
-                      {orderDetails.time_choice === 'scheduled' && orderDetails.scheduled_time
-                        ? (() => {
-                            const parsed = new Date(orderDetails.scheduled_time)
-                            return Number.isNaN(parsed.getTime())
-                              ? 'As soon as possible'
-                              : parsed.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
-                          })()
-                        : 'As soon as possible'}
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>Payment:</span>
-                    <span className="font-semibold">
-                      {orderDetails.payment_method === 'online' ? 'Pay online' : (orderDetails.payment_method || 'Pay online')}
-                    </span>
-                  </div>
-                  {orderDetails.comments && (
-                    <div className="text-sm text-gray-700">
-                      <span className="font-semibold">Comments:</span> {orderDetails.comments}
-                    </div>
-                  )}
+              {orderDetails.comments && (
+                <div className="bg-gray-50 rounded-lg p-6 mb-8 text-left">
+                  <h3 className="font-semibold text-lg text-gray-900 mb-2">Comments</h3>
+                  <p className="text-sm text-gray-700 whitespace-pre-wrap">{orderDetails.comments}</p>
                 </div>
-              </div>
+              )}
             </>
           ) : (
             <div className="bg-gray-50 rounded-lg p-6 mb-8 text-left">
@@ -324,8 +298,8 @@ function OrderConfirmationContent() {
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-8">
             <p className="text-sm text-blue-900">
               <strong>Need to make changes?</strong> Call us at{' '}
-              <a href="tel:+17207630786" className="font-semibold underline">
-                (720) 763-0786
+              <a href="tel:+17205733605" className="font-semibold underline">
+                (720) 573-3605
               </a>{' '}
               and we&apos;ll be happy to help!
             </p>
@@ -333,7 +307,11 @@ function OrderConfirmationContent() {
 
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Link
-              href="/order-tracking"
+              href={
+                orderDetails?.id
+                  ? `/order-tracking?orderId=${encodeURIComponent(orderDetails.id)}`
+                  : '/order-tracking'
+              }
               className="inline-flex items-center justify-center bg-black text-white px-8 py-3 rounded-lg font-semibold hover:bg-gray-800 transition-colors"
             >
               Track Your Order

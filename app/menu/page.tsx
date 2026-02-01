@@ -8,11 +8,9 @@ import Image from 'next/image'
 
 const categories = [
   'All',
-  'Sandwiches',
-  'Kabobs',
-  'Rice Dishes',
-  'Combo Plates',
   'Appetizers',
+  'Rice Dishes',
+  'Sandwiches',
 ] as const
 
 export default function MenuPage() {

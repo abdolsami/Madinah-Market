@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import Stripe from 'stripe'
-import { getCart } from '@/lib/cart'
+
+export const runtime = 'nodejs'
+export const dynamic = 'force-dynamic'
 
 const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY
 
@@ -10,7 +12,7 @@ if (!STRIPE_SECRET_KEY) {
 
 const stripe = STRIPE_SECRET_KEY
   ? new Stripe(STRIPE_SECRET_KEY, {
-      apiVersion: '2024-11-20.acacia',
+      apiVersion: '2023-10-16',
     })
   : null
 
@@ -61,20 +63,6 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const normalizedOrderType = (orderDetails?.orderType || 'pickup').toString()
-    const normalizedTimeChoice = (orderDetails?.timeChoice || 'asap').toString()
-    const normalizedScheduledTime = orderDetails?.scheduledTime || ''
-    const normalizedPaymentMethod = (orderDetails?.paymentMethod || 'online').toString()
-    const normalizedTipPercent = Number(orderDetails?.tipPercent || 0)
-    const normalizedComments = (orderDetails?.comments || '').toString()
-
-    if (normalizedTimeChoice === 'scheduled' && !normalizedScheduledTime) {
-      return NextResponse.json(
-        { error: 'Scheduled time is required for scheduled orders' },
-        { status: 400 }
-      )
-    }
-
     // Validate item structure
     for (const item of items) {
       if (!item.id || !item.name || typeof item.price !== 'number' || !item.quantity) {
@@ -100,14 +88,24 @@ export async function POST(request: NextRequest) {
       return sum + itemPrice * item.quantity
     }, 0)
     const TAX_RATE = 0.08 // 8% tax
-    const tax = subtotal * TAX_RATE
-    const calculatedTipAmount = Number(
-      (typeof orderDetails?.tipAmount === 'number'
-        ? orderDetails.tipAmount
-        : (subtotal * normalizedTipPercent) / 100
-      ).toFixed(2)
-    )
-    const total = subtotal + tax + calculatedTipAmount
+    const tax = Number((subtotal * TAX_RATE).toFixed(2))
+
+    const rawTipPercent = Number(orderDetails?.tipPercent ?? 0)
+    const normalizedTipPercent = Number.isFinite(rawTipPercent)
+      ? Math.min(Math.max(rawTipPercent, 0), 100)
+      : 0
+    const tipAmount = Number((subtotal * (normalizedTipPercent / 100)).toFixed(2))
+
+    const normalizedComments = (orderDetails?.comments || '').toString().trim().slice(0, 400)
+
+    const total = Number((subtotal + tax + tipAmount).toFixed(2))
+
+    if (!Number.isFinite(total) || total <= 0) {
+      return NextResponse.json(
+        { error: 'Invalid order total. Please review your cart and try again.' },
+        { status: 400 }
+      )
+    }
 
     // Build line items including addons
     const lineItems: Stripe.Checkout.SessionCreateParams.LineItem[] = []
@@ -157,14 +155,14 @@ export async function POST(request: NextRequest) {
       })
     }
 
-    if (calculatedTipAmount > 0) {
+    if (tipAmount > 0) {
       lineItems.push({
         price_data: {
           currency: 'usd',
           product_data: {
             name: 'Tip',
           },
-          unit_amount: Math.round(calculatedTipAmount * 100),
+          unit_amount: Math.round(tipAmount * 100),
         },
         quantity: 1,
       })
@@ -183,12 +181,8 @@ export async function POST(request: NextRequest) {
         customer_last_name: customerLastName,
         customer_phone: customerPhone,
         customer_email: customerEmail,
-        order_type: normalizedOrderType,
-        time_choice: normalizedTimeChoice,
-        scheduled_time: normalizedScheduledTime,
-        payment_method: normalizedPaymentMethod,
         tip_percent: normalizedTipPercent.toFixed(2),
-        tip_amount: calculatedTipAmount.toFixed(2),
+        tip_amount: tipAmount.toFixed(2),
         comments: normalizedComments,
         subtotal: subtotal.toFixed(2),
         tax: tax.toFixed(2),

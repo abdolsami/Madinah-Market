@@ -3,7 +3,7 @@
 import { MapPin } from 'lucide-react'
 
 export default function Map() {
-  const address = '3126 S Parker Rd, Aurora, CO 80014'
+  const address = '19245 E 56th Ave, Denver, CO 80249'
   const encodedAddress = encodeURIComponent(address)
   // Using Google Maps embed URL - works without API key
   const googleMapsUrl = `https://maps.google.com/maps?q=${encodedAddress}&t=&z=15&ie=UTF8&iwloc=&output=embed`
@@ -20,7 +20,7 @@ export default function Map() {
           loading="lazy"
           referrerPolicy="no-referrer-when-downgrade"
           className="w-full h-full"
-          title="Madinah Market Location"
+          title="Denver Kabob Location"
         />
       </div>
       <div className="mt-4 sm:mt-6 flex items-center justify-center">

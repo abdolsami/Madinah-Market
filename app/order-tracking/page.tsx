@@ -1,9 +1,10 @@
 'use client'
 
-import { useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Search, Phone, Hash, Clock, ChefHat, Package, CheckCircle, Loader2 } from 'lucide-react'
 import { Order } from '@/lib/types'
 import Link from 'next/link'
+import { useSearchParams } from 'next/navigation'
 
 const statusConfig = {
   pending: { label: 'Pending', color: 'bg-yellow-100 text-yellow-800', icon: Clock },
@@ -30,54 +31,119 @@ const formatRequestedTime = (order: Order) => {
 }
 
 export default function OrderTrackingPage() {
+  const searchParams = useSearchParams()
   const [searchType, setSearchType] = useState<'phone' | 'orderId'>('phone')
   const [searchValue, setSearchValue] = useState('')
+  const [lastQuery, setLastQuery] = useState<{ type: 'phone' | 'orderId'; value: string } | null>(null)
   const [orders, setOrders] = useState<Order[]>([])
   const [loading, setLoading] = useState(false)
+  const [isRefreshing, setIsRefreshing] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [hasSearched, setHasSearched] = useState(false)
+  const didAutoSearchRef = useRef(false)
+
+  const fetchTrackedOrders = useCallback(
+    async (
+      query: { type: 'phone' | 'orderId'; value: string },
+      opts?: { silent?: boolean }
+    ) => {
+      const silent = !!opts?.silent
+      if (silent) {
+        setIsRefreshing(true)
+      } else {
+        setLoading(true)
+        setError(null)
+        setHasSearched(true)
+      }
+
+      try {
+        const param = query.type === 'phone' ? 'phone' : 'orderId'
+        const response = await fetch(`/api/orders/lookup?${param}=${encodeURIComponent(query.value)}`, {
+          cache: 'no-store',
+          headers: {
+            'Cache-Control': 'no-cache',
+            'Pragma': 'no-cache',
+          },
+        })
+        
+        const data = await response.json().catch(() => ({}))
+        
+        if (!response.ok) {
+          throw new Error(data.error || 'Failed to search for orders')
+        }
+
+        const nextOrders: Order[] = Array.isArray(data.orders) ? data.orders : []
+        setOrders(nextOrders)
+        
+        // Only show "no orders" / errors on an explicit search, not background refresh.
+        if (!silent) {
+          if (nextOrders.length === 0) {
+            setError('No orders found. Please check your phone number or order ID.')
+          }
+        }
+      } catch (err: any) {
+        if (!silent) {
+          setError(err.message || 'Failed to search for orders')
+          setOrders([])
+        }
+      } finally {
+        if (silent) {
+          setIsRefreshing(false)
+        } else {
+          setLoading(false)
+        }
+      }
+    },
+    []
+  )
 
   const handleSearch = async () => {
-    if (!searchValue.trim()) {
+    const trimmed = searchValue.trim()
+    if (!trimmed) {
       setError('Please enter a phone number or order ID')
       return
     }
 
     // Validate phone number format
     if (searchType === 'phone') {
-      const phoneDigits = searchValue.replace(/\D/g, '')
+      const phoneDigits = trimmed.replace(/\D/g, '')
       if (phoneDigits.length < 10) {
         setError('Please enter a valid phone number (at least 10 digits)')
         return
       }
     }
 
-    setLoading(true)
-    setError(null)
-    setHasSearched(true)
-
-    try {
-      const param = searchType === 'phone' ? 'phone' : 'orderId'
-      const response = await fetch(`/api/orders/lookup?${param}=${encodeURIComponent(searchValue)}`)
-      
-      if (!response.ok) {
-        const data = await response.json()
-        throw new Error(data.error || 'Failed to search for orders')
-      }
-
-      const data = await response.json()
-      setOrders(data.orders || [])
-      
-      if (data.orders.length === 0) {
-        setError('No orders found. Please check your phone number or order ID.')
-      }
-    } catch (err: any) {
-      setError(err.message || 'Failed to search for orders')
-      setOrders([])
-    } finally {
-      setLoading(false)
-    }
+    const query = { type: searchType, value: trimmed }
+    setLastQuery(query)
+    await fetchTrackedOrders(query)
   }
+
+  // Auto-refresh results so status changes show up
+  useEffect(() => {
+    if (!hasSearched || !lastQuery) return
+    const interval = setInterval(() => {
+      fetchTrackedOrders(lastQuery, { silent: true })
+    }, 5000)
+    return () => clearInterval(interval)
+  }, [hasSearched, lastQuery, fetchTrackedOrders])
+
+  // Auto-search when arriving from order confirmation
+  useEffect(() => {
+    if (didAutoSearchRef.current) return
+    const orderIdParam = searchParams.get('orderId')
+    const phoneParam = searchParams.get('phone')
+    const value = (orderIdParam || phoneParam || '').trim()
+    if (!value) return
+
+    didAutoSearchRef.current = true
+    const type: 'orderId' | 'phone' = orderIdParam ? 'orderId' : 'phone'
+    setSearchType(type)
+    setSearchValue(value)
+    setError(null)
+    const query = { type, value }
+    setLastQuery(query)
+    fetchTrackedOrders(query)
+  }, [searchParams, fetchTrackedOrders])
 
   const formatPhone = (phone: string) => {
     const cleaned = phone.replace(/\D/g, '')
@@ -99,30 +165,31 @@ export default function OrderTrackingPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 py-12">
+    <div className="min-h-screen bg-gray-50 pt-24 sm:pt-28 pb-12">
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="text-center mb-8">
-          <h1 className="font-display text-4xl font-bold text-gray-900 mb-4">
+        <div className="text-center mb-6 sm:mb-8">
+          <h1 className="font-display text-3xl sm:text-4xl font-bold text-gray-900 mb-2 sm:mb-4">
             Track Your Order
           </h1>
-          <p className="text-lg text-gray-600">
+          <p className="text-base sm:text-lg text-gray-600">
             Enter your phone number or order ID to view your order status
           </p>
         </div>
 
         {/* Search Form */}
-        <div className="bg-white rounded-xl shadow-lg p-6 mb-8">
+        <div className="bg-white rounded-2xl sm:rounded-xl shadow-sm sm:shadow-lg p-4 sm:p-6 mb-6 sm:mb-8">
           <div className="flex flex-col sm:flex-row gap-4 mb-4">
-            <div className="flex gap-2">
+            <div className="grid grid-cols-2 gap-2 w-full sm:flex sm:w-auto sm:gap-2">
               <button
                 onClick={() => {
                   setSearchType('phone')
                   setSearchValue('')
+                  setLastQuery(null)
                   setOrders([])
                   setError(null)
                   setHasSearched(false)
                 }}
-                className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors ${
+                className={`w-full justify-center flex items-center gap-2 px-4 py-2.5 rounded-lg font-semibold transition-colors ${
                   searchType === 'phone'
                     ? 'bg-black text-white'
                     : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
@@ -135,11 +202,12 @@ export default function OrderTrackingPage() {
                 onClick={() => {
                   setSearchType('orderId')
                   setSearchValue('')
+                  setLastQuery(null)
                   setOrders([])
                   setError(null)
                   setHasSearched(false)
                 }}
-                className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors ${
+                className={`w-full justify-center flex items-center gap-2 px-4 py-2.5 rounded-lg font-semibold transition-colors ${
                   searchType === 'orderId'
                     ? 'bg-black text-white'
                     : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
@@ -151,7 +219,7 @@ export default function OrderTrackingPage() {
             </div>
           </div>
 
-          <div className="flex gap-3">
+          <div className="flex flex-col sm:flex-row gap-3">
             <input
               type={searchType === 'phone' ? 'tel' : 'text'}
               value={searchValue}
@@ -170,7 +238,7 @@ export default function OrderTrackingPage() {
             <button
               onClick={handleSearch}
               disabled={loading}
-              className="px-6 py-3 bg-black text-white rounded-lg font-semibold hover:bg-gray-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              className="w-full sm:w-auto px-6 py-3 bg-black text-white rounded-lg font-semibold hover:bg-gray-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
               {loading ? (
                 <>
@@ -194,32 +262,40 @@ export default function OrderTrackingPage() {
         </div>
 
         {/* Results */}
-        {hasSearched && !loading && (
+        {hasSearched && (
           <>
             {orders.length > 0 ? (
               <div className="space-y-6">
-                <h2 className="text-2xl font-bold text-gray-900">
-                  {orders.length === 1 ? 'Your Order' : `Your Orders (${orders.length})`}
-                </h2>
+                <div className="flex items-center justify-between gap-3">
+                  <h2 className="text-xl sm:text-2xl font-bold text-gray-900">
+                    {orders.length === 1 ? 'Your Order' : `Your Orders (${orders.length})`}
+                  </h2>
+                  {(loading || isRefreshing) && (
+                    <div className="text-xs text-gray-500 flex items-center gap-2">
+                      <Loader2 className="animate-spin" size={14} />
+                      <span>Updating…</span>
+                    </div>
+                  )}
+                </div>
                 {orders.map((order) => {
                   const StatusIcon = statusConfig[order.status].icon
                   return (
                     <div
                       key={order.id}
-                      className="bg-white rounded-xl shadow-lg p-6 border border-gray-200"
+                      className="bg-white rounded-2xl sm:rounded-xl shadow-sm sm:shadow-lg p-4 sm:p-6 border border-gray-200"
                     >
-                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4">
+                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
                         <div>
-                          <h3 className="text-xl font-bold text-gray-900 mb-1">
+                          <h3 className="text-lg sm:text-xl font-bold text-gray-900 mb-1">
                             Order #{(order as any).order_number || order.id.substring(0, 8)}
                           </h3>
                           <p className="text-sm text-gray-600">
                             Placed on {formatDate(order.created_at)}
                           </p>
                         </div>
-                        <div className="mt-2 sm:mt-0">
+                        <div className="sm:mt-0">
                           <div
-                            className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg ${statusConfig[order.status].color}`}
+                            className={`w-full sm:w-auto inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg ${statusConfig[order.status].color}`}
                           >
                             <StatusIcon size={18} />
                             <span className="font-semibold">
@@ -286,21 +362,7 @@ export default function OrderTrackingPage() {
                             <strong>Email:</strong> {order.customer_email}
                           </p>
                         )}
-                        <p className="text-sm text-gray-600">
-                          <strong>Order type:</strong> {order.order_type || 'pickup'}
-                        </p>
-                        <p className="text-sm text-gray-600">
-                          <strong>Requested time:</strong> {formatRequestedTime(order)}
-                        </p>
-                        <p className="text-sm text-gray-600">
-                          <strong>Payment:</strong>{' '}
-                          {order.payment_method === 'online' ? 'Pay online' : (order.payment_method || 'Pay online')}
-                        </p>
-                        {order.comments && (
-                          <p className="text-sm text-gray-600">
-                            <strong>Comments:</strong> {order.comments}
-                          </p>
-                        )}
+                        {/* Order details removed (mobile-first simplified checkout) */}
                       </div>
                     </div>
                   )
@@ -317,22 +379,22 @@ export default function OrderTrackingPage() {
         )}
 
         {/* Help Section */}
-        <div className="mt-8 bg-blue-50 border border-blue-200 rounded-lg p-6">
+        <div className="mt-8 bg-blue-50 border border-blue-200 rounded-xl p-5 sm:p-6">
           <h3 className="font-semibold text-blue-900 mb-2">Need Help?</h3>
           <p className="text-sm text-blue-800 mb-4">
             If you&apos;re having trouble finding your order, please contact us directly.
           </p>
           <div className="flex flex-col sm:flex-row gap-3">
             <a
-              href="tel:+17207630786"
-              className="inline-flex items-center justify-center gap-2 bg-blue-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-blue-700 transition-colors"
+              href="tel:+17205733605"
+              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 bg-blue-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-blue-700 transition-colors"
             >
               <Phone size={18} />
-              Call (720) 763-0786
+              Call (720) 573-3605
             </a>
             <Link
               href="/"
-              className="inline-flex items-center justify-center gap-2 border-2 border-blue-600 text-blue-900 px-6 py-3 rounded-lg font-semibold hover:bg-blue-100 transition-colors"
+              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 border-2 border-blue-600 text-blue-900 px-6 py-3 rounded-lg font-semibold hover:bg-blue-100 transition-colors"
             >
               Back to Home
             </Link>

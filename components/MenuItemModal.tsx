@@ -28,19 +28,19 @@ interface FreeOption {
   label: string
 }
 
+const EMPTY_STRING_ARRAY: string[] = []
+const EMPTY_ADDON_ARRAY: Array<{ name: string; price: number }> = []
+
+// Paid add-ons are intentionally limited to things that make sense for the current menu.
+// (No chips, no sodas, no generic add-ons that don't apply to the item.)
 const paidAddons: AddonOption[] = [
+  { id: 'extra-rice', label: 'XTRA RICE', price: 1 },
   { id: 'extra-gyros', label: 'XTRA GYROS', price: 1 },
   { id: 'extra-chicken-shawarma', label: 'XTRA CHICKEN SHAWARMA', price: 1 },
-  { id: 'extra-rice', label: 'XTRA RICE', price: 1 },
-  { id: 'extra-falafel', label: 'XTRA 3 PCS FLAFEL', price: 1 },
-  { id: 'extra-fries', label: 'XTRA FRIES', price: 1 },
-  { id: 'extra-fish', label: 'XTRA FISH(1 PCS)', price: 1 },
-  { id: 'extra-kobideh', label: 'XTRA KOBIDEH KABOB(BEEF)', price: 1 },
   { id: 'extra-chicken-kabob', label: 'XTRA CHICKEN KABOB', price: 1 },
-  { id: 'can-soda', label: 'add can soda', price: 1 },
-  { id: 'chips', label: 'add frito lays chips', price: 1 },
-  { id: 'water', label: 'add water', price: 1 },
-  { id: 'bottle-soda', label: 'add bottle soda', price: 1 },
+  { id: 'extra-kobideh', label: 'XTRA KOBIDEH KABOB (BEEF)', price: 1 },
+  { id: 'extra-falafel', label: 'XTRA 3 PCS FALAFEL', price: 1 },
+  { id: 'extra-lamb-kabob', label: 'XTRA LAMB KABOB', price: 1 },
 ]
 
 const freeOptions: FreeOption[] = [
@@ -49,17 +49,57 @@ const freeOptions: FreeOption[] = [
   { id: 'no-sauce', label: 'NO SAUCE' },
   { id: 'add-hot-sauce', label: 'ADD HOT SAUCE' },
   { id: 'extra-white-sauce', label: 'XTRA WHITE SAUCE' },
-  { id: 'no-rice-extra-salad', label: 'No rice xtra salad' },
   { id: 'no-fries', label: 'No fries' },
-  { id: 'no-cucumber', label: 'No cucumber' },
 ]
 
-const drinkOptions: AddonOption[] = [
-  { id: 'drink-can-soda', label: 'Can soda', price: 1 },
-  { id: 'drink-water', label: 'Water', price: 1 },
-  { id: 'drink-sunny-d', label: 'Sunny d drink', price: 1 },
-  { id: 'drink-bottle-soda', label: 'Bottle soda', price: 1 },
-]
+const getPaidAddonsForItem = (item: MenuItem): AddonOption[] => {
+  // Rice dishes can add extra rice, and only the matching protein add-on (when applicable).
+  if (item.category === 'Rice Dishes') {
+    const base: AddonOption[] = [paidAddons.find((a) => a.id === 'extra-rice')!]
+    switch (item.id) {
+      case 'gyro-rice':
+        return [...base, paidAddons.find((a) => a.id === 'extra-gyros')!]
+      case 'shawarma-rice':
+        return [...base, paidAddons.find((a) => a.id === 'extra-chicken-shawarma')!]
+      case 'chicken-kabob-rice':
+        return [...base, paidAddons.find((a) => a.id === 'extra-chicken-kabob')!]
+      case 'kobidah-kabob-rice':
+        return [...base, paidAddons.find((a) => a.id === 'extra-kobideh')!]
+      case 'lamb-kabob-rice':
+        return [...base, paidAddons.find((a) => a.id === 'extra-lamb-kabob')!]
+      // Lamb items: extra rice only (no generic "extra gyro/chicken" nonsense)
+      case 'lamb-shank-rice':
+      default:
+        return base
+    }
+  }
+
+  // Sandwiches: no extra meat options (per requirements).
+  if (item.category === 'Sandwiches') return []
+
+  // Appetizers: only falafel can add extra falafel. Wings/sambosa should not have unrelated extras.
+  if (item.category === 'Appetizers') {
+    if (item.id === 'falafel') return [paidAddons.find((a) => a.id === 'extra-falafel')!]
+    return []
+  }
+
+  return []
+}
+
+const getFreeOptionsForItem = (item: MenuItem): FreeOption[] => {
+  // Keep free options sensible per item type.
+  if (item.category === 'Rice Dishes') {
+    return freeOptions.filter((o) =>
+      ['no-salad', 'no-sauce', 'add-hot-sauce', 'extra-white-sauce'].includes(o.id)
+    )
+  }
+  if (item.category === 'Sandwiches') {
+    return freeOptions.filter((o) =>
+      ['no-lettuce', 'no-sauce', 'add-hot-sauce', 'extra-white-sauce'].includes(o.id)
+    )
+  }
+  return []
+}
 
 export default function MenuItemModal({
   item,
@@ -67,20 +107,20 @@ export default function MenuItemModal({
   onClose,
   mode = 'add',
   initialQuantity = 1,
-  initialSelectedOptions = [],
-  initialSelectedAddons = [],
+  initialSelectedOptions = EMPTY_STRING_ARRAY,
+  initialSelectedAddons = EMPTY_ADDON_ARRAY,
   originalCartItemId,
 }: MenuItemModalProps) {
   const [quantity, setQuantity] = useState(1)
   const [selectedAddons, setSelectedAddons] = useState<Set<string>>(new Set())
   const [selectedFreeOptions, setSelectedFreeOptions] = useState<Set<string>>(new Set())
-  const [selectedDrink, setSelectedDrink] = useState<string>('')
+  const [selectedSambosaFilling, setSelectedSambosaFilling] = useState<'potato' | 'beef' | ''>('')
   const [isAdding, setIsAdding] = useState(false)
 
   const resetSelections = () => {
     setSelectedAddons(new Set())
     setSelectedFreeOptions(new Set())
-    setSelectedDrink('')
+    setSelectedSambosaFilling('')
   }
 
   // Reset state when modal closes
@@ -90,29 +130,63 @@ export default function MenuItemModal({
     onClose()
   }
 
+  // Lock background scroll while modal is open (mobile-friendly)
+  useEffect(() => {
+    if (!isOpen) return
+    const body = document.body
+    const prevCount = Number(body.dataset.scrollLockCount || '0')
+    const nextCount = prevCount + 1
+    body.dataset.scrollLockCount = String(nextCount)
+    if (prevCount === 0) {
+      body.dataset.scrollLockPrevOverflow = body.style.overflow || ''
+      body.style.overflow = 'hidden'
+    }
+    return () => {
+      const current = Number(body.dataset.scrollLockCount || '1')
+      const updated = Math.max(0, current - 1)
+      body.dataset.scrollLockCount = String(updated)
+      if (updated === 0) {
+        body.style.overflow = body.dataset.scrollLockPrevOverflow || ''
+        delete body.dataset.scrollLockPrevOverflow
+        delete body.dataset.scrollLockCount
+      }
+    }
+  }, [isOpen])
+
   useEffect(() => {
     if (!isOpen || !item) return
-    
+
     setQuantity(initialQuantity || 1)
-    
+
+    // Sambosa filling is a single-select choice (potato OR beef).
+    if (item.id === 'potato-or-beef-sambosa') {
+      const hasPotato = initialSelectedOptions.some((opt) => opt.toLowerCase() === 'potato')
+      const hasBeef = initialSelectedOptions.some((opt) => opt.toLowerCase() === 'beef')
+      if (hasBeef) setSelectedSambosaFilling('beef')
+      else if (hasPotato) setSelectedSambosaFilling('potato')
+      else setSelectedSambosaFilling('potato') // default
+    } else {
+      setSelectedSambosaFilling('')
+    }
+
+    const allowedFree = getFreeOptionsForItem(item)
     const freeOptionIds = new Set<string>()
     initialSelectedOptions.forEach((label) => {
-      const match = freeOptions.find((option) => option.label === label)
+      const match = allowedFree.find((option) => option.label === label)
       if (match) freeOptionIds.add(match.id)
     })
     setSelectedFreeOptions(freeOptionIds)
-    
+
+    const allowedPaid = getPaidAddonsForItem(item)
     const addonIds = new Set<string>()
-    let drinkId = ''
     initialSelectedAddons.forEach((addon) => {
-      const paidMatch = paidAddons.find((paid) => paid.label === addon.name)
+      const paidMatch = allowedPaid.find((paid) => paid.label === addon.name)
       if (paidMatch) addonIds.add(paidMatch.id)
-      const drinkMatch = drinkOptions.find((drink) => drink.label === addon.name)
-      if (drinkMatch) drinkId = drinkMatch.id
     })
     setSelectedAddons(addonIds)
-    setSelectedDrink(drinkId)
-  }, [isOpen, item, initialQuantity, initialSelectedOptions, initialSelectedAddons])
+    // Re-initialize only when opening or switching items
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, item?.id, originalCartItemId, initialQuantity])
 
   if (!isOpen || !item) return null
 
@@ -142,11 +216,6 @@ export default function MenuItemModal({
       const addon = paidAddons.find((a) => a.id === id)
       if (addon) addonTotal += addon.price
     })
-    
-    if (selectedDrink) {
-      const drink = drinkOptions.find((d) => d.id === selectedDrink)
-      if (drink) addonTotal += drink.price
-    }
 
     return (item.price + addonTotal) * quantity
   }
@@ -157,10 +226,6 @@ export default function MenuItemModal({
       const addon = paidAddons.find((a) => a.id === id)
       if (addon) addons.push({ name: addon.label, price: addon.price })
     })
-    if (selectedDrink) {
-      const drink = drinkOptions.find((d) => d.id === selectedDrink)
-      if (drink) addons.push({ name: drink.label, price: drink.price })
-    }
     return addons
   }
 
@@ -170,6 +235,10 @@ export default function MenuItemModal({
       const option = freeOptions.find((o) => o.id === id)
       if (option) options.push(option.label)
     })
+    if (item.id === 'potato-or-beef-sambosa') {
+      if (selectedSambosaFilling === 'potato') options.push('Potato')
+      if (selectedSambosaFilling === 'beef') options.push('Beef')
+    }
     return options
   }
 
@@ -204,10 +273,9 @@ export default function MenuItemModal({
         // Update quantity
         updateCartItemQuantity(uniqueId, existingItem.quantity + quantity)
       } else {
-        // Add new item with quantity
-        for (let i = 0; i < quantity; i++) {
-          addToCart(cartItem)
-        }
+        // Add once, then set the desired quantity (avoids N repeated saves/events)
+        addToCart(cartItem)
+        updateCartItemQuantity(uniqueId, quantity)
       }
     }
     
@@ -220,14 +288,20 @@ export default function MenuItemModal({
   const finalPrice = calculateTotal()
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
-      onClick={handleClose}
-    >
+    <div className="fixed inset-0 z-50">
+      {/* Backdrop: click to close, blocks background interactions */}
       <div
-        className="bg-white rounded-2xl max-w-3xl w-full max-h-[95vh] flex flex-col shadow-2xl relative"
-        onClick={(e) => e.stopPropagation()}
-      >
+        className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+        onClick={handleClose}
+        aria-hidden="true"
+      />
+
+      {/* Modal */}
+      <div className="relative h-full w-full flex items-center justify-center p-4">
+        <div
+          className="bg-white rounded-2xl max-w-3xl w-full max-h-[95dvh] flex flex-col shadow-2xl relative"
+          onClick={(e) => e.stopPropagation()}
+        >
         {/* Close Button */}
         <button
           onClick={handleClose}
@@ -238,7 +312,7 @@ export default function MenuItemModal({
         </button>
 
         {/* Scrollable Content */}
-        <div className="flex-1 overflow-y-auto">
+        <div className="flex-1 overflow-y-auto overscroll-contain">
           <div className="p-4 sm:p-5">
             {/* Image - Now scrollable */}
             {item.image_url && (
@@ -264,91 +338,93 @@ export default function MenuItemModal({
             )}
 
             {/* Optional Add-ons */}
-            <div className="mb-4">
-              <h3 className="text-sm sm:text-base font-semibold mb-2 text-gray-900">OPTIONS - Optional</h3>
-              <div className="space-y-1.5">
-                {paidAddons.map((addon) => (
-                  <label
-                    key={addon.id}
-                    className="flex items-center justify-between p-2 sm:p-2.5 border border-gray-200 rounded-lg hover:border-black transition-colors cursor-pointer"
-                    onClick={(e) => {
-                      e.preventDefault()
-                      toggleAddon(addon.id)
-                    }}
-                  >
-                    <div className="flex items-center gap-2.5">
-                      <input
-                        type="checkbox"
-                        checked={selectedAddons.has(addon.id)}
-                        onChange={() => {}}
-                        onClick={(e) => e.stopPropagation()}
-                        className="w-4 h-4 border-gray-300 rounded text-black focus:ring-black cursor-pointer"
-                        readOnly
-                      />
-                      <span className="text-xs sm:text-sm font-medium text-gray-900">{addon.label}</span>
-                    </div>
-                    <span className="text-xs sm:text-sm font-semibold text-gray-900">${addon.price.toFixed(2)}</span>
-                  </label>
-                ))}
-              </div>
-            </div>
+            {(() => {
+              const allowedPaid = getPaidAddonsForItem(item)
+              if (allowedPaid.length === 0) return null
+              return (
+                <div className="mb-4">
+                  <h3 className="text-sm sm:text-base font-semibold mb-2 text-gray-900">OPTIONS - Optional</h3>
+                  <div className="space-y-1.5">
+                    {allowedPaid.map((addon) => (
+                      <label
+                        key={addon.id}
+                        className="flex items-center justify-between p-2 sm:p-2.5 border border-gray-200 rounded-lg hover:border-black transition-colors cursor-pointer"
+                      >
+                        <div className="flex items-center gap-2.5">
+                          <input
+                            type="checkbox"
+                            checked={selectedAddons.has(addon.id)}
+                            onChange={() => toggleAddon(addon.id)}
+                            className="w-4 h-4 border-gray-300 rounded text-black focus:ring-black cursor-pointer"
+                          />
+                          <span className="text-xs sm:text-sm font-medium text-gray-900">{addon.label}</span>
+                        </div>
+                        <span className="text-xs sm:text-sm font-semibold text-gray-900">${addon.price.toFixed(2)}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              )
+            })()}
 
             {/* Free Options */}
-            <div className="mb-4">
-              <div className="space-y-1.5">
-                {freeOptions.map((option) => (
-                  <label
-                    key={option.id}
-                    className="flex items-center p-2 sm:p-2.5 border border-gray-200 rounded-lg hover:border-black transition-colors cursor-pointer"
-                    onClick={(e) => {
-                      e.preventDefault()
-                      toggleFreeOption(option.id)
-                    }}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={selectedFreeOptions.has(option.id)}
-                      onChange={() => {}}
-                      onClick={(e) => e.stopPropagation()}
-                      className="w-4 h-4 border-gray-300 rounded text-black focus:ring-black cursor-pointer"
-                      readOnly
-                    />
-                    <span className="ml-2.5 text-xs sm:text-sm font-medium text-gray-900">{option.label}</span>
-                  </label>
-                ))}
-              </div>
-            </div>
+            {(() => {
+              const allowedFree = getFreeOptionsForItem(item)
+              if (allowedFree.length === 0) return null
+              return (
+                <div className="mb-4">
+                  <div className="space-y-1.5">
+                    {allowedFree.map((option) => (
+                      <label
+                        key={option.id}
+                        className="flex items-center p-2 sm:p-2.5 border border-gray-200 rounded-lg hover:border-black transition-colors cursor-pointer"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={selectedFreeOptions.has(option.id)}
+                          onChange={() => toggleFreeOption(option.id)}
+                          className="w-4 h-4 border-gray-300 rounded text-black focus:ring-black cursor-pointer"
+                        />
+                        <span className="ml-2.5 text-xs sm:text-sm font-medium text-gray-900">{option.label}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              )
+            })()}
 
-            {/* Drink Options */}
-            <div className="mb-4">
-              <h3 className="text-sm sm:text-base font-semibold mb-2 text-gray-900">Drink option - Optional</h3>
-              <div className="space-y-1.5">
-                {drinkOptions.map((drink) => (
-                  <label
-                    key={drink.id}
-                    className="flex items-center justify-between p-2 sm:p-2.5 border border-gray-200 rounded-lg hover:border-black transition-colors cursor-pointer"
-                    onClick={(e) => {
-                      e.preventDefault()
-                      setSelectedDrink(drink.id)
-                    }}
-                  >
+            {/* Sambosa filling (single select) */}
+            {item.id === 'potato-or-beef-sambosa' ? (
+              <div className="mb-4">
+                <h3 className="text-sm sm:text-base font-semibold mb-2 text-gray-900">Sambosa filling</h3>
+                <div className="space-y-1.5">
+                  <label className="flex items-center justify-between p-2 sm:p-2.5 border border-gray-200 rounded-lg hover:border-black transition-colors cursor-pointer">
                     <div className="flex items-center gap-2.5">
                       <input
                         type="radio"
-                        name="drink"
-                        checked={selectedDrink === drink.id}
-                        onChange={() => {}}
-                        onClick={(e) => e.stopPropagation()}
+                        name="sambosa-filling"
+                        checked={selectedSambosaFilling === 'potato'}
+                        onChange={() => setSelectedSambosaFilling('potato')}
                         className="w-4 h-4 border-gray-300 text-black focus:ring-black cursor-pointer"
-                        readOnly
                       />
-                      <span className="text-xs sm:text-sm font-medium text-gray-900">{drink.label}</span>
+                      <span className="text-xs sm:text-sm font-medium text-gray-900">Potato</span>
                     </div>
-                    <span className="text-xs sm:text-sm font-semibold text-gray-900">${drink.price.toFixed(2)}</span>
                   </label>
-                ))}
+                  <label className="flex items-center justify-between p-2 sm:p-2.5 border border-gray-200 rounded-lg hover:border-black transition-colors cursor-pointer">
+                    <div className="flex items-center gap-2.5">
+                      <input
+                        type="radio"
+                        name="sambosa-filling"
+                        checked={selectedSambosaFilling === 'beef'}
+                        onChange={() => setSelectedSambosaFilling('beef')}
+                        className="w-4 h-4 border-gray-300 text-black focus:ring-black cursor-pointer"
+                      />
+                      <span className="text-xs sm:text-sm font-medium text-gray-900">Beef</span>
+                    </div>
+                  </label>
+                </div>
               </div>
-            </div>
+            ) : null}
 
             {/* Quantity */}
             <div className="mb-4">
@@ -395,6 +471,7 @@ export default function MenuItemModal({
               )}
             </button>
           </div>
+        </div>
         </div>
       </div>
     </div>

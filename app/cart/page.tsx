@@ -3,12 +3,11 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { getCart, updateCartItemQuantity, removeFromCart } from '@/lib/cart'
-import { 
-  calculateSubtotal, 
-  calculateTax, 
-  calculateTipAmount, 
+import {
+  calculateSubtotal,
+  calculateTax,
+  calculateTipAmount,
   calculateTotal,
-  generateTimeSlots 
 } from '@/lib/cart-utils'
 import { CartItem, MenuItem } from '@/lib/types'
 import { Minus, Plus, Trash2, ShoppingBag } from 'lucide-react'
@@ -28,10 +27,6 @@ export default function CartPage() {
     lastName: '',
     phone: '',
     email: '',
-    orderType: 'pickup' as 'pickup' | 'delivery',
-    timeChoice: 'asap' as 'asap' | 'scheduled',
-    scheduledTime: '',
-    paymentMethod: 'online' as 'online',
     tipPercent: 0,
     comments: '',
   })
@@ -48,7 +43,7 @@ export default function CartPage() {
     
     // Listen for storage changes (when cart is updated from other tabs/pages)
     const handleStorageChange = (e: StorageEvent) => {
-      if (e.key === 'madinah-market-cart') {
+      if (e.key === 'denver-kabob-cart') {
         updateCart()
       }
     }
@@ -105,8 +100,6 @@ export default function CartPage() {
   const tipAmount = calculateTipAmount(subtotal, customerInfo.tipPercent)
   const total = calculateTotal(subtotal, tax, tipAmount)
 
-  const availableTimes = useMemo(() => generateTimeSlots(), [])
-
   const tipAmountForPercent = (percent: number) =>
     (subtotal * (percent / 100)).toFixed(2)
 
@@ -134,18 +127,6 @@ export default function CartPage() {
     }
     if (!customerInfo.lastName.trim()) {
       setCheckoutError('Please enter your last name')
-      return
-    }
-
-    // Validate order type
-    if (!customerInfo.orderType) {
-      setCheckoutError('Please select an order type')
-      return
-    }
-
-    // Validate time choice
-    if (customerInfo.timeChoice === 'scheduled' && !customerInfo.scheduledTime) {
-      setCheckoutError('Please select an available time')
       return
     }
 
@@ -179,20 +160,15 @@ export default function CartPage() {
     }
 
     const orderDetails = {
-      orderType: customerInfo.orderType,
-      timeChoice: customerInfo.timeChoice,
-      scheduledTime: customerInfo.timeChoice === 'scheduled' ? customerInfo.scheduledTime : '',
-      paymentMethod: customerInfo.paymentMethod,
       tipPercent: customerInfo.tipPercent,
-      tipAmount,
-      comments: customerInfo.comments.trim() || '',
+      comments: customerInfo.comments.trim().slice(0, 400),
     }
 
     // Save customer info to localStorage for order creation fallback
     try {
-      localStorage.setItem('madinah-market-cart', JSON.stringify(cart))
-      localStorage.setItem('madinah-market-customer-info', JSON.stringify(customerPayload))
-      localStorage.setItem('madinah-market-order-details', JSON.stringify(orderDetails))
+      localStorage.setItem('denver-kabob-cart', JSON.stringify(cart))
+      localStorage.setItem('denver-kabob-customer-info', JSON.stringify(customerPayload))
+      localStorage.setItem('denver-kabob-order-details', JSON.stringify(orderDetails))
     } catch (e) {
       console.error('Failed to save to localStorage:', e)
     }
@@ -258,7 +234,7 @@ export default function CartPage() {
 
   if (cart.length === 0) {
     return (
-      <div className="min-h-screen bg-white py-12">
+      <div className="min-h-screen bg-white pt-24 sm:pt-28 pb-12">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <ShoppingBag size={64} className="mx-auto text-gray-400 mb-6" />
           <h1 className="font-display text-4xl font-bold text-gray-900 mb-4">
@@ -285,17 +261,17 @@ export default function CartPage() {
           Your Cart
         </h1>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
           {/* Cart Items */}
-          <div className="lg:col-span-2 space-y-4">
+          <div className="lg:col-span-7 space-y-4 pb-24 lg:pb-0">
             {cart.map((item) => (
               <div
                 key={item.id}
-                className="bg-white border border-gray-200 rounded-lg p-6 flex flex-col sm:flex-row gap-4 cursor-pointer hover:border-black transition-colors"
+                className="bg-white border border-gray-200 rounded-lg p-3 sm:p-4 flex flex-col sm:flex-row gap-3 cursor-pointer hover:border-black transition-colors"
                 onClick={() => handleEditItem(item)}
               >
                 {item.image_url && (
-                  <div className="relative w-full sm:w-24 h-24 flex-shrink-0 bg-gray-100 rounded-lg overflow-hidden">
+                  <div className="relative w-full sm:w-36 h-36 flex-shrink-0 bg-gray-100 rounded-xl overflow-hidden">
                     <Image
                       src={item.image_url}
                       alt={item.name}
@@ -387,226 +363,200 @@ export default function CartPage() {
           </div>
 
           {/* Order Summary */}
-          <div className="lg:col-span-1">
-            <div className="bg-gray-50 border border-gray-200 rounded-lg p-6 sticky top-24">
-              <h2 className="font-display text-2xl font-bold text-gray-900 mb-6">
-                Order Summary
-              </h2>
+          <div className="hidden lg:block lg:col-span-5">
+            <div className="bg-white border border-gray-200 rounded-xl shadow-sm">
+              <div className="p-6 border-b border-gray-200">
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <h2 className="font-display text-2xl font-bold text-gray-900">
+                      Checkout
+                    </h2>
+                    <p className="text-sm text-gray-600 mt-1">
+                      Review totals and add your details.
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-xs text-gray-500">Total</div>
+                    <div className="text-2xl font-bold text-gray-900">${total.toFixed(2)}</div>
+                  </div>
+                </div>
+              </div>
 
-              {/* Customer Info Form */}
-              <div className="space-y-4 mb-6">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">
-                      First Name *
-                    </label>
-                    <input
-                      type="text"
-                      value={customerInfo.firstName}
-                      onChange={(e) =>
-                        setCustomerInfo({ ...customerInfo, firstName: e.target.value })
-                      }
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-black bg-white"
-                      required
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">
-                      Last Name *
-                    </label>
-                    <input
-                      type="text"
-                      value={customerInfo.lastName}
-                      onChange={(e) =>
-                        setCustomerInfo({ ...customerInfo, lastName: e.target.value })
-                      }
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-black bg-white"
-                      required
-                    />
-                  </div>
-                </div>
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Phone *
-                  </label>
-                  <input
-                    type="tel"
-                    value={customerInfo.phone}
-                    onChange={(e) =>
-                      setCustomerInfo({ ...customerInfo, phone: e.target.value })
-                    }
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-black bg-white"
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Email (optional)
-                  </label>
-                  <input
-                    type="email"
-                    value={customerInfo.email}
-                    onChange={(e) =>
-                      setCustomerInfo({ ...customerInfo, email: e.target.value })
-                    }
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-black bg-white"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Select order type *
-                  </label>
-                  <select
-                    value={customerInfo.orderType}
-                    onChange={(e) =>
-                      setCustomerInfo({ ...customerInfo, orderType: e.target.value as 'pickup' | 'delivery' })
-                    }
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-black bg-white"
-                  >
-                    <option value="pickup">Pickup</option>
-                    <option value="delivery">Delivery</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Available time choice *
-                  </label>
-                  <div className="flex flex-col gap-2">
-                    <label className="flex items-center gap-2 text-sm text-gray-700">
+              {/* No internal scroll; page scrolls normally */}
+              <div className="p-6 pt-4 space-y-4">
+                <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
+                  <h3 className="font-semibold text-gray-900 mb-3">Customer info</h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-700 mb-1">
+                        First name *
+                      </label>
                       <input
-                        type="radio"
-                        name="timeChoice"
-                        value="asap"
-                        checked={customerInfo.timeChoice === 'asap'}
-                        onChange={() =>
-                          setCustomerInfo({ ...customerInfo, timeChoice: 'asap', scheduledTime: '' })
-                        }
-                      />
-                      As soon as possible
-                    </label>
-                    <label className="flex items-center gap-2 text-sm text-gray-700">
-                      <input
-                        type="radio"
-                        name="timeChoice"
-                        value="scheduled"
-                        checked={customerInfo.timeChoice === 'scheduled'}
-                        onChange={() =>
-                          setCustomerInfo({
-                            ...customerInfo,
-                            timeChoice: 'scheduled',
-                            scheduledTime: availableTimes[0]?.value || '',
-                          })
-                        }
-                      />
-                      Schedule for later
-                    </label>
-                    {customerInfo.timeChoice === 'scheduled' && (
-                      <select
-                        value={customerInfo.scheduledTime}
+                        type="text"
+                        value={customerInfo.firstName}
                         onChange={(e) =>
-                          setCustomerInfo({ ...customerInfo, scheduledTime: e.target.value })
+                          setCustomerInfo({ ...customerInfo, firstName: e.target.value })
                         }
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-black bg-white"
-                      >
-                        {availableTimes.map((slot) => (
-                          <option key={slot.value} value={slot.value}>
-                            {slot.label}
-                          </option>
-                        ))}
-                      </select>
-                    )}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-black bg-white"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-700 mb-1">
+                        Last name *
+                      </label>
+                      <input
+                        type="text"
+                        value={customerInfo.lastName}
+                        onChange={(e) =>
+                          setCustomerInfo({ ...customerInfo, lastName: e.target.value })
+                        }
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-black bg-white"
+                        required
+                      />
+                    </div>
+                  </div>
+                  <div className="mt-3">
+                    <label className="block text-xs font-semibold text-gray-700 mb-1">
+                      Phone *
+                    </label>
+                    <input
+                      type="tel"
+                      value={customerInfo.phone}
+                      onChange={(e) =>
+                        setCustomerInfo({ ...customerInfo, phone: e.target.value })
+                      }
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-black bg-white"
+                      required
+                    />
+                  </div>
+                  <div className="mt-3">
+                    <label className="block text-xs font-semibold text-gray-700 mb-1">
+                      Email (optional)
+                    </label>
+                    <input
+                      type="email"
+                      value={customerInfo.email}
+                      onChange={(e) =>
+                        setCustomerInfo({ ...customerInfo, email: e.target.value })
+                      }
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-black bg-white"
+                    />
                   </div>
                 </div>
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Payment method
-                  </label>
-                  <select
-                    value={customerInfo.paymentMethod}
-                    onChange={(e) =>
-                      setCustomerInfo({ ...customerInfo, paymentMethod: e.target.value as 'online' })
-                    }
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-black bg-white"
-                  >
-                    <option value="online">Pay online</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Tips?
-                  </label>
-                  <select
-                    value={customerInfo.tipPercent}
-                    onChange={(e) =>
-                      setCustomerInfo({ ...customerInfo, tipPercent: Number(e.target.value) })
-                    }
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-black bg-white"
-                  >
-                    <option value={0}>0% (${tipAmountForPercent(0)})</option>
-                    <option value={10}>10% (${tipAmountForPercent(10)})</option>
-                    <option value={15}>15% (${tipAmountForPercent(15)})</option>
-                    <option value={20}>20% (${tipAmountForPercent(20)})</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Comments (optional)
-                  </label>
-                  <textarea
-                    rows={3}
-                    value={customerInfo.comments}
-                    onChange={(e) =>
-                      setCustomerInfo({ ...customerInfo, comments: e.target.value })
-                    }
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-black bg-white"
-                    placeholder="Add notes for the kitchen"
-                  />
-                </div>
+
+                <details className="group rounded-lg border border-gray-200 bg-gray-50">
+                  <summary className="cursor-pointer select-none px-4 py-3 flex items-center justify-between">
+                    <span className="font-semibold text-gray-900">Tip & notes</span>
+                    <span className="text-xs text-gray-500 group-open:hidden">Optional</span>
+                  </summary>
+                  <div className="px-4 pb-4 pt-1 space-y-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-xs font-semibold text-gray-700 mb-1">
+                          Tip
+                        </label>
+                        <select
+                          value={customerInfo.tipPercent}
+                          onChange={(e) =>
+                            setCustomerInfo({ ...customerInfo, tipPercent: Number(e.target.value) })
+                          }
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-black bg-white"
+                        >
+                          <option value={0}>0% (${tipAmountForPercent(0)})</option>
+                          <option value={10}>10% (${tipAmountForPercent(10)})</option>
+                          <option value={15}>15% (${tipAmountForPercent(15)})</option>
+                          <option value={20}>20% (${tipAmountForPercent(20)})</option>
+                        </select>
+                      </div>
+                      <div className="bg-white border border-gray-200 rounded-lg px-3 py-2">
+                        <div className="text-xs text-gray-500">Tip amount</div>
+                        <div className="text-lg font-semibold text-gray-900">${tipAmount.toFixed(2)}</div>
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-700 mb-1">
+                        Comments (optional)
+                      </label>
+                      <textarea
+                        rows={3}
+                        value={customerInfo.comments}
+                        onChange={(e) =>
+                          setCustomerInfo({ ...customerInfo, comments: e.target.value })
+                        }
+                        maxLength={400}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-black bg-white"
+                        placeholder="Notes for the kitchen"
+                      />
+                      <div className="mt-1 text-xs text-gray-500">
+                        {customerInfo.comments.length}/400
+                      </div>
+                    </div>
+                  </div>
+                </details>
               </div>
 
-              {/* Totals */}
-              <div className="border-t border-gray-300 pt-4 space-y-2 mb-6">
-                <div className="flex justify-between text-gray-600">
-                  <span>Subtotal</span>
-                  <span>${subtotal.toFixed(2)}</span>
+              <div className="p-6 border-t border-gray-200 bg-white">
+                <div className="space-y-2">
+                  <div className="flex justify-between text-sm text-gray-600">
+                    <span>Subtotal</span>
+                    <span>${subtotal.toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between text-sm text-gray-600">
+                    <span>Tax</span>
+                    <span>${tax.toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between text-sm text-gray-600">
+                    <span>Tip</span>
+                    <span>${tipAmount.toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between font-bold text-lg text-gray-900 pt-2 border-t border-gray-200">
+                    <span>Total</span>
+                    <span>${total.toFixed(2)}</span>
+                  </div>
                 </div>
-                <div className="flex justify-between text-gray-600">
-                  <span>Tax (8%)</span>
-                  <span>${tax.toFixed(2)}</span>
-                </div>
-                <div className="flex justify-between text-gray-600">
-                  <span>Tip</span>
-                  <span>${tipAmount.toFixed(2)}</span>
-                </div>
-                <div className="flex justify-between font-bold text-xl text-gray-900 pt-2 border-t border-gray-300">
-                  <span>Total</span>
-                  <span>${total.toFixed(2)}</span>
-                </div>
-              </div>
 
-              {checkoutError && (
-                <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
-                  {checkoutError}
-                </div>
-              )}
-              <button
-                onClick={handleCheckout}
-                disabled={isProcessing}
-                className="w-full bg-black text-white py-4 rounded-lg font-semibold text-lg hover:bg-gray-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-              >
-                {isProcessing ? (
-                  <>
-                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                    <span>Processing...</span>
-                  </>
-                ) : (
-                  'Proceed to Checkout'
+                {checkoutError && (
+                  <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
+                    {checkoutError}
+                  </div>
                 )}
-              </button>
+                <button
+                  onClick={handleCheckout}
+                  disabled={isProcessing}
+                  className="mt-4 w-full bg-black text-white py-4 rounded-lg font-semibold text-lg hover:bg-gray-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                >
+                  {isProcessing ? (
+                    <>
+                      <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                      <span>Processing...</span>
+                    </>
+                  ) : (
+                    'Proceed to Checkout'
+                  )}
+                </button>
+              </div>
             </div>
           </div>
         </div>
       </div>
+
+      {/* Mobile bottom checkout bar */}
+      <div className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur border-t border-gray-200">
+        <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between gap-3">
+          <div>
+            <div className="text-xs text-gray-500">Total</div>
+            <div className="text-lg font-bold text-gray-900">${total.toFixed(2)}</div>
+          </div>
+          <Link
+            href="/checkout"
+            className="flex-1 max-w-[260px] text-center bg-black text-white py-3 rounded-lg font-semibold hover:bg-gray-800 transition-colors"
+          >
+            Checkout
+          </Link>
+        </div>
+      </div>
+
       <MenuItemModal
         item={editingMenuItem}
         isOpen={isEditModalOpen}

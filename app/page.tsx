@@ -14,7 +14,7 @@ export default function Home() {
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20 sm:py-32 md:py-40">
           <div className="text-center animate-fade-in">
             <h1 className="font-display text-5xl sm:text-6xl md:text-8xl lg:text-9xl font-bold mb-4 sm:mb-6 tracking-tight text-gray-900">
-              Madinah Market
+              Denver Kabob
             </h1>
             <p className="text-lg sm:text-xl md:text-2xl mb-6 sm:mb-8 text-gray-600 max-w-2xl mx-auto font-light px-4">
               Authentic Afghan Cuisine with Traditional Flavors
@@ -32,11 +32,11 @@ export default function Home() {
                 <ArrowRight size={20} />
               </Link>
               <a
-                href="tel:+17207630786"
+                href="tel:+17205733605"
                 className="w-full sm:w-auto inline-flex items-center justify-center space-x-2 border-2 border-gray-300 text-gray-900 px-6 sm:px-8 py-3 sm:py-4 rounded-lg text-base sm:text-lg font-semibold hover:border-black transition-colors"
               >
                 <Phone size={20} />
-                <span>(720) 763-0786</span>
+                <span>(720) 573-3605</span>
               </a>
             </div>
           </div>
@@ -44,7 +44,7 @@ export default function Home() {
       </section>
 
       {/* Features Section */}
-      <section className="py-12 sm:py-20 bg-gray-50">
+      <section className="hidden sm:block py-12 sm:py-20 bg-gray-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8 sm:gap-12">
             <div className="text-center">
@@ -95,7 +95,47 @@ export default function Home() {
               Discover our most popular dishes, each crafted with care and authentic flavors
             </p>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
+
+          {/* Mobile carousel */}
+          <div className="sm:hidden -mx-4 px-4 overflow-x-auto no-scrollbar">
+            <div className="flex gap-4 snap-x snap-mandatory">
+              {featuredDishes.map((dish) => (
+                <Link
+                  key={dish.id}
+                  href="/menu"
+                  className="snap-start shrink-0 w-[85%] bg-white border border-gray-200 rounded-xl overflow-hidden hover:border-black transition-all group"
+                >
+                  <div className="relative h-56 w-full bg-gray-100 overflow-hidden">
+                    {dish.image_url && (
+                      <Image
+                        src={dish.image_url}
+                        alt={dish.name}
+                        fill
+                        className="object-cover group-hover:scale-105 transition-transform duration-300"
+                      />
+                    )}
+                  </div>
+                  <div className="p-4">
+                    <h3 className="font-display text-xl font-semibold mb-2 text-gray-900">
+                      {dish.name}
+                    </h3>
+                    <p className="text-gray-600 mb-4 line-clamp-2 text-sm leading-relaxed">{dish.description}</p>
+                    <div className="flex items-center justify-between">
+                      <span className="text-gray-900 font-bold text-xl">
+                        ${dish.price.toFixed(2)}
+                      </span>
+                      <span className="text-gray-400 group-hover:text-black transition-colors text-sm">
+                        Swipe →
+                      </span>
+                    </div>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          </div>
+
+          {/* Desktop grid */}
+          <div className="hidden sm:grid grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
             {featuredDishes.map((dish) => (
               <Link
                 key={dish.id}
@@ -140,7 +180,7 @@ export default function Home() {
               Visit Us
             </h2>
             <p className="text-base sm:text-lg text-gray-600 max-w-2xl mx-auto px-4">
-              Come experience authentic Afghan cuisine at our location in Aurora, Colorado
+              Come experience authentic Afghan cuisine at our location in Denver, Colorado
             </p>
           </div>
           <div className="max-w-5xl mx-auto">

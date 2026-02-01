@@ -2,7 +2,7 @@
 
 ## Quick Start Guide
 
-Follow these steps to get your Madinah Market website up and running.
+Follow these steps to get your Denver Kabob website up and running.
 
 ## Step 1: Supabase Setup
 
@@ -11,7 +11,7 @@ Follow these steps to get your Madinah Market website up and running.
 1. Go to [supabase.com](https://supabase.com) and sign up/login
 2. Click "New Project"
 3. Fill in:
-   - **Name**: Madinah Market (or your choice)
+   - **Name**: Denver Kabob (or your choice)
    - **Database Password**: Choose a strong password (save it!)
    - **Region**: Choose closest to you
 4. Wait for project to be created (~2 minutes)
@@ -47,10 +47,6 @@ Follow these steps to get your Madinah Market website up and running.
    - **Secret key** → `STRIPE_SECRET_KEY` (keep secret!)
 
 ### 2.3 Set Up Webhook (For Production)
-
-**For Local Development:**
-- Use Stripe CLI: `stripe listen --forward-to localhost:3000/api/webhook`
-- Copy the webhook secret it provides
 
 **For Production:**
 1. In Stripe Dashboard, go to **Developers** → **Webhooks**
@@ -97,7 +93,7 @@ Follow these steps to get your Madinah Market website up and running.
 
 3. **Open browser:**
    ```
-   http://localhost:3000
+   https://your-domain.com
    ```
 
 ## Step 5: Test the Flow

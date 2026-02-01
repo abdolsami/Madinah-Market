@@ -5,7 +5,7 @@ import { Order } from '@/lib/types'
 import { Clock, ChefHat, CheckCircle, Package, Phone, X } from 'lucide-react'
 
 const ADMIN_PASSWORD = process.env.NEXT_PUBLIC_ADMIN_PASSWORD || 'admin123'
-const ADMIN_SESSION_KEY = 'madinah-market-admin-authenticated'
+const ADMIN_SESSION_KEY = 'denver-kabob-admin-authenticated'
 
 const statusConfig = {
   pending: { label: 'Pending', color: 'bg-yellow-100 text-yellow-800', icon: Clock },
@@ -57,6 +57,7 @@ const setAdminSession = (authenticated: boolean): void => {
 export default function AdminDashboard() {
   const [orders, setOrders] = useState<Order[]>([])
   const [loading, setLoading] = useState(true)
+  const [isRefreshing, setIsRefreshing] = useState(false)
   const [password, setPassword] = useState('')
   const [authenticated, setAuthenticated] = useState(false)
   const [error, setError] = useState('')
@@ -73,54 +74,51 @@ export default function AdminDashboard() {
   const lastOrderIdsRef = useRef<Set<string>>(new Set())
 
   useEffect(() => {
-    // Initialize audio function for notifications
-    // This will be called when user interacts with page (required for autoplay)
-    audioRef.current = {
-      play: () => {
-        try {
-          const ctx = new (window.AudioContext || (window as any).webkitAudioContext)()
-          const osc = ctx.createOscillator()
-          const gain = ctx.createGain()
-          osc.connect(gain)
-          gain.connect(ctx.destination)
-          osc.frequency.value = 800
-          osc.type = 'sine'
-          gain.gain.setValueAtTime(0.3, ctx.currentTime)
-          gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.3)
-          osc.start(ctx.currentTime)
-          osc.stop(ctx.currentTime + 0.3)
-        } catch (e) {
-          // Ignore audio errors
-        }
-      }
-    } as any
+    // Use your custom alarm sound
+    // Note: browsers require user interaction before audio can autoplay
+    const audio = new Audio('/sounds/alarm.wav')
+    audio.loop = true
+    audio.preload = 'auto'
+    audio.volume = 1
+    audioRef.current = audio
   }, [])
 
-  const playNotificationSound = () => {
-    if (audioRef.current) {
-      audioRef.current.play().catch(() => {
-        // Ignore audio play errors (user interaction required)
-      })
+  const playNotificationSound = useCallback(() => {
+    if (!audioRef.current) return
+    try {
+      const maybePromise = audioRef.current.play()
+      if (maybePromise && typeof (maybePromise as any).catch === 'function') {
+        ;(maybePromise as any).catch(() => {
+          // Ignore audio play errors (user interaction required)
+        })
+      }
+    } catch {
+      // Ignore audio errors
     }
-  }
+  }, [])
 
-  const playContinuousSound = () => {
-    // Stop any existing sound
+  const playContinuousSound = useCallback(() => {
+    // Stop any existing loop
     if (audioIntervalRef.current) {
       clearInterval(audioIntervalRef.current)
+      audioIntervalRef.current = null
     }
-
-    // Play sound every 2 seconds
+    // Ensure audio plays (loop is enabled)
     playNotificationSound()
-    audioIntervalRef.current = setInterval(() => {
-      playNotificationSound()
-    }, 2000)
-  }
+  }, [playNotificationSound])
 
   const stopSound = () => {
     if (audioIntervalRef.current) {
       clearInterval(audioIntervalRef.current)
       audioIntervalRef.current = null
+    }
+    if (audioRef.current) {
+      try {
+        audioRef.current.pause()
+        audioRef.current.currentTime = 0
+      } catch {
+        // Ignore audio errors
+      }
     }
   }
 
@@ -130,10 +128,15 @@ export default function AdminDashboard() {
     }
   }, [])
 
-  const fetchOrders = useCallback(async () => {
+  const fetchOrders = useCallback(async (opts?: { silent?: boolean }) => {
+    const silent = !!opts?.silent
     try {
       setFetchError(null)
-      setLoading(true)
+      if (silent) {
+        setIsRefreshing(true)
+      } else {
+        setLoading(true)
+      }
       
       const response = await fetch('/api/orders', {
         cache: 'no-store',
@@ -160,25 +163,25 @@ export default function AdminDashboard() {
         throw new Error('Invalid response format from server')
       }
       
-      const fetchedOrders = Array.isArray(data.orders) ? data.orders : []
+      const fetchedOrders: Order[] = Array.isArray(data.orders) ? data.orders : []
       
       // Check for new orders by comparing order IDs
       const currentOrderIds = new Set(fetchedOrders.map((o: Order) => o.id))
       
       if (lastOrderIdsRef.current.size > 0) {
         // Find new orders
-        const newIds = Array.from(currentOrderIds).filter(id => !lastOrderIdsRef.current.has(id))
+        const newIds = Array.from(currentOrderIds).filter((id) => !lastOrderIdsRef.current.has(id))
         
         if (newIds.length > 0) {
           // Get the newest order details
-          const newOrders = fetchedOrders.filter((o: Order) => newIds.includes(o.id))
-          const newestOrder = newOrders.sort((a, b) => 
+          const newOrders = fetchedOrders.filter((o) => newIds.includes(o.id))
+          const newestOrder = newOrders.sort((a: Order, b: Order) => 
             new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
           )[0]
           const orderNumber = (newestOrder as any)?.order_number || null
           
           setHasNewOrder(true)
-          setNewOrderIds(new Set(newIds))
+          setNewOrderIds(new Set<string>(newIds))
           setNewOrderNumber(orderNumber)
           setShowNewOrderAlert(true)
           
@@ -201,12 +204,20 @@ export default function AdminDashboard() {
       lastOrderIdsRef.current = currentOrderIds
       setOrders(fetchedOrders)
       setLastFetchTime(new Date())
-      setLoading(false)
+      if (silent) {
+        setIsRefreshing(false)
+      } else {
+        setLoading(false)
+      }
     } catch (error: any) {
       console.error('Error fetching orders:', error)
       const errorMessage = error?.message || 'Failed to fetch orders. Check your connection and try refreshing.'
       setFetchError(errorMessage)
-      setLoading(false)
+      if (silent) {
+        setIsRefreshing(false)
+      } else {
+        setLoading(false)
+      }
     }
   }, [playContinuousSound])
 
@@ -238,7 +249,7 @@ export default function AdminDashboard() {
       
       // Set up polling interval
       const interval = setInterval(() => {
-        fetchOrders()
+        fetchOrders({ silent: true })
       }, 5000) // Poll every 5 seconds
       
       // Request notification permission
@@ -412,11 +423,11 @@ export default function AdminDashboard() {
               Test DB
             </button>
             <button
-              onClick={fetchOrders}
-              disabled={loading}
+              onClick={() => fetchOrders()}
+              disabled={loading || isRefreshing}
               className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg font-medium transition-colors disabled:opacity-50"
             >
-              {loading ? 'Refreshing...' : 'Refresh'}
+              {loading || isRefreshing ? 'Refreshing...' : 'Refresh'}
             </button>
             <button
               onClick={() => {
@@ -502,7 +513,7 @@ export default function AdminDashboard() {
         </div>
 
         {/* Orders List */}
-        {loading ? (
+        {loading && orders.length === 0 ? (
           <div className="text-center py-12">
             <Clock className="animate-spin mx-auto text-gray-400 mb-4" size={48} />
             <p className="text-lg text-gray-600">Loading orders...</p>
@@ -568,22 +579,11 @@ export default function AdminDashboard() {
                             <span className="font-semibold">Email:</span> {order.customer_email}
                           </p>
                         )}
-                        <p className="text-gray-700">
-                          <span className="font-semibold">Order type:</span> {order.order_type || 'pickup'}
-                        </p>
-                        <p className="text-gray-700">
-                          <span className="font-semibold">Requested time:</span> {formatRequestedTime(order)}
-                        </p>
-                        <p className="text-gray-700">
-                          <span className="font-semibold">Payment:</span>{' '}
-                          {order.payment_method === 'online' ? 'Pay online' : (order.payment_method || 'Pay online')}
-                        </p>
-                        <p className="text-gray-700">
-                          <span className="font-semibold">Tip:</span>{' '}
-                          {typeof order.tip_amount === 'number'
-                            ? `$${order.tip_amount.toFixed(2)}`
-                            : '$0.00'}
-                        </p>
+                        {typeof order.tip_amount === 'number' && order.tip_amount > 0 && (
+                          <p className="text-gray-700">
+                            <span className="font-semibold">Tip:</span> ${order.tip_amount.toFixed(2)}
+                          </p>
+                        )}
                         {order.comments && (
                           <p className="text-gray-700">
                             <span className="font-semibold">Comments:</span> {order.comments}

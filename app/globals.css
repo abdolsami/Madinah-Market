@@ -71,7 +71,7 @@ html {
 }
 
 /* Animations */
-@keyframes fade-in {
+@keyframes fade-in-up {
   from {
     opacity: 0;
     transform: translateY(20px);
@@ -82,8 +82,17 @@ html {
   }
 }
 
-.animate-fade-in {
-  animation: fade-in 0.8s ease-out;
+.animate-fade-in-up {
+  animation: fade-in-up 0.8s ease-out;
+}
+
+/* Hide scrollbar (mobile carousels) */
+.no-scrollbar {
+  -ms-overflow-style: none; /* IE and Edge */
+  scrollbar-width: none; /* Firefox */
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none; /* Chrome, Safari */
 }
 
 /* Smooth transitions for all interactive elements */
